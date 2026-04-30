@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { ensureCurrentUserRow } from "@/lib/users";
 import { toggleTournament } from "@/app/uic/actions";
+import { LEAGUE_VENUE } from "@/lib/league";
 import {
   formatGameDate,
   formatGameTime,
@@ -148,7 +149,16 @@ export default async function GamesPage() {
                               {g.division_code}
                             </span>
                             <span className="text-sm text-zinc-500">
-                              {formatGameTime(g.starts_at)} · {g.field}
+                              {formatGameTime(g.starts_at)} ·{" "}
+                              <a
+                                href={LEAGUE_VENUE.mapsUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-brand-700 underline-offset-2 hover:underline"
+                                title={LEAGUE_VENUE.address}
+                              >
+                                {g.field}
+                              </a>
                             </span>
                           </div>
                           <div className="mt-1.5 truncate text-sm font-medium text-zinc-900">

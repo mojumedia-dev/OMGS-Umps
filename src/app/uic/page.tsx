@@ -10,6 +10,7 @@ import {
 } from "@/lib/format";
 import type { Game, User } from "@/lib/db/types";
 import { approveRequest, declineRequest } from "./actions";
+import { LEAGUE_VENUE } from "@/lib/league";
 
 export const dynamic = "force-dynamic";
 
@@ -107,7 +108,16 @@ export default async function UicQueuePage() {
                                 {g.division_code}
                               </span>
                               <span className="text-sm text-zinc-500">
-                                {formatGameTime(g.starts_at)} · {g.field}
+                                {formatGameTime(g.starts_at)} ·{" "}
+                                <a
+                                  href={LEAGUE_VENUE.mapsUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-brand-700 underline-offset-2 hover:underline"
+                                  title={LEAGUE_VENUE.address}
+                                >
+                                  {g.field}
+                                </a>
                               </span>
                               <span className="text-xs text-zinc-400">
                                 {formatMoney(g.pay_per_slot)}

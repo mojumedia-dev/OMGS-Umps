@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { ensureCurrentUserRow } from "@/lib/users";
 import { supabaseServer } from "@/lib/supabase/server";
 import { cancelMyRequest } from "@/app/games/actions";
+import { LEAGUE_VENUE } from "@/lib/league";
 import {
   formatGameDate,
   formatGameTime,
@@ -282,7 +283,16 @@ export default async function DashboardPage() {
                                 {g.division_code}
                               </span>
                               <span className="text-sm text-zinc-500">
-                                {formatGameTime(g.starts_at)} · {g.field}
+                                {formatGameTime(g.starts_at)} ·{" "}
+                                <a
+                                  href={LEAGUE_VENUE.mapsUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-brand-700 underline-offset-2 hover:underline"
+                                  title={LEAGUE_VENUE.address}
+                                >
+                                  {g.field}
+                                </a>
                               </span>
                             </div>
                             <div className="mt-1.5 truncate text-sm font-medium text-zinc-900">

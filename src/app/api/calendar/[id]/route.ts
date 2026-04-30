@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ensureCurrentUserRow } from "@/lib/users";
 import { supabaseServer } from "@/lib/supabase/server";
+import { venueLabel, LEAGUE_VENUE } from "@/lib/league";
 
 export const dynamic = "force-dynamic";
 
@@ -68,7 +69,7 @@ export async function GET(
   if (!g) return new NextResponse("Game missing", { status: 404 });
 
   const summary = `Umpire: ${g.division_code} ${g.team_home} vs ${g.team_away}`;
-  const description = `OMGS umpiring assignment\\nDivision: ${g.division_code}\\nField: ${g.field}\\nPay: $${g.pay_per_slot}\\nStatus: ${data.status}`;
+  const description = `OMGS umpiring assignment\\nDivision: ${g.division_code}\\nField: ${g.field}\\nPay: $${g.pay_per_slot}\\nStatus: ${data.status}\\nMap: ${LEAGUE_VENUE.mapsUrl}`;
 
   const lines = [
     "BEGIN:VCALENDAR",
@@ -99,7 +100,7 @@ export async function GET(
     `DTSTART;TZID=America/Denver:${icsLocal(g.starts_at)}`,
     `DTEND;TZID=America/Denver:${icsLocal(g.ends_at)}`,
     `SUMMARY:${escapeIcs(summary)}`,
-    `LOCATION:${escapeIcs(g.field)}`,
+    `LOCATION:${escapeIcs(venueLabel(g.field))}`,
     `DESCRIPTION:${escapeIcs(description)}`,
     "STATUS:CONFIRMED",
     "END:VEVENT",
