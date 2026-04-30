@@ -75,29 +75,13 @@ export default async function UicQueuePage() {
   return (
     <main className="flex-1 px-4 py-8 sm:px-6">
       <div className="mx-auto w-full max-w-3xl">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              Pending requests
-            </h1>
-            <p className="mt-1 text-sm text-zinc-600">
-              {requests.length} awaiting your review
-            </p>
-          </div>
-          <div className="flex gap-3 text-sm">
-            <Link
-              href="/uic/payouts"
-              className="font-medium text-brand-700 hover:text-brand-900"
-            >
-              Payouts →
-            </Link>
-            <Link
-              href="/dashboard"
-              className="font-medium text-zinc-600 hover:text-zinc-900"
-            >
-              ← Dashboard
-            </Link>
-          </div>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+            Pending requests
+          </h1>
+          <p className="mt-1 text-sm text-zinc-600">
+            {requests.length} awaiting your review
+          </p>
         </div>
 
         {requests.length === 0 ? (

@@ -79,21 +79,13 @@ export default async function GamesPage() {
   return (
     <main className="flex-1 px-4 py-8 sm:px-6">
       <div className="mx-auto w-full max-w-3xl">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              All games
-            </h1>
-            <p className="mt-1 text-sm text-zinc-600">
-              {games.length} upcoming · {grouped.size} game days
-            </p>
-          </div>
-          <Link
-            href={user ? "/dashboard" : "/"}
-            className="text-sm font-medium text-zinc-600 hover:text-zinc-900"
-          >
-            ← {user ? "Dashboard" : "Home"}
-          </Link>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+            All games
+          </h1>
+          <p className="mt-1 text-sm text-zinc-600">
+            {games.length} upcoming · {grouped.size} game days
+          </p>
         </div>
 
         {!user && (

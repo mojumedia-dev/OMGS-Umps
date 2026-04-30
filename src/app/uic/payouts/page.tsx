@@ -80,20 +80,12 @@ export default async function PayoutsPage() {
               {formatMoney(unpaidTotal)} owed · {formatMoney(paidTotal)} paid
             </p>
           </div>
-          <div className="flex gap-3 text-sm">
-            <Link
-              href="/uic"
-              className="font-medium text-zinc-600 hover:text-zinc-900"
-            >
-              ← Approvals
-            </Link>
-            <a
-              href="/api/reports/payouts.csv"
-              className="font-medium text-brand-700 hover:text-brand-900"
-            >
-              CSV ↓
-            </a>
-          </div>
+          <a
+            href="/api/reports/payouts.csv"
+            className="text-sm font-medium text-brand-700 hover:text-brand-900"
+          >
+            CSV ↓
+          </a>
         </div>
 
         {eligible.length === 0 ? (

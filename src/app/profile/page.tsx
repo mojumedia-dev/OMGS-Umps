@@ -18,16 +18,10 @@ export default async function ProfilePage() {
   return (
     <main className="flex-1 px-4 py-8 sm:px-6">
       <div className="mx-auto w-full max-w-xl">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6">
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
             Profile
           </h1>
-          <Link
-            href="/dashboard"
-            className="text-sm font-medium text-zinc-600 hover:text-zinc-900"
-          >
-            ← Dashboard
-          </Link>
         </div>
 
         <section className="mb-6 rounded-lg border border-zinc-200 bg-white p-5">
