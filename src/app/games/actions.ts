@@ -13,20 +13,14 @@ export async function requestGame(formData: FormData): Promise<void> {
 
   const sb = supabaseServer();
 
-  // Verify game exists, isn't fully filled, and the user is eligible for the division
   const { data: game } = await sb
     .from("games")
-    .select("id, ump_slots, status, division_code")
+    .select("id, ump_slots, status")
     .eq("id", gameId)
     .single();
   if (!game) throw new Error("Game not found");
   if (game.status === "filled" || game.status === "cancelled")
     throw new Error("Game not available");
-  if (!user.eligible_divisions?.includes(game.division_code)) {
-    throw new Error(
-      `You're not eligible for ${game.division_code}. Update your profile to add it.`
-    );
-  }
 
   const { error } = await sb.from("assignments").insert({
     game_id: gameId,

@@ -95,7 +95,7 @@ export default async function DashboardPage() {
             href="/profile"
             className="mt-2 inline-block text-xs font-semibold text-brand-700 underline-offset-2 hover:underline"
           >
-            Edit profile · {user.eligible_divisions?.length ?? 0} divisions eligible
+            Edit profile
           </Link>
         </div>
 

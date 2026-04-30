@@ -53,11 +53,11 @@ export default async function ProfilePage() {
 
         <form action={updateEligibility} className="rounded-lg border border-zinc-200 bg-white p-5">
           <h2 className="text-base font-bold text-brand-800">
-            Eligible divisions
+            Division preferences
           </h2>
           <p className="mt-1 text-sm text-zinc-600">
-            Pick the divisions you can umpire. You won&apos;t be able to request
-            games outside your selection.
+            Tick the divisions you typically umpire. Used by the UIC for assignment
+            suggestions — you can still request any game.
           </p>
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
             {ALL_DIVISIONS.map((d) => {

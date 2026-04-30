@@ -238,7 +238,7 @@ function GameAction({
   mine,
   remaining,
 }: {
-  user: { id: string; eligible_divisions?: string[] } | null;
+  user: { id: string } | null;
   game: Game;
   mine: { id: string; status: Assignment["status"] } | undefined;
   remaining: number;
@@ -253,8 +253,6 @@ function GameAction({
       </Link>
     );
   }
-
-  const eligible = user.eligible_divisions?.includes(game.division_code) ?? true;
 
   if (mine) {
     const label =
@@ -290,18 +288,6 @@ function GameAction({
       <span className="inline-flex h-9 items-center justify-center rounded-md bg-zinc-100 px-3 text-xs font-medium text-zinc-500">
         Full
       </span>
-    );
-  }
-
-  if (!eligible) {
-    return (
-      <Link
-        href="/profile"
-        className="inline-flex h-9 items-center justify-center rounded-md border border-zinc-300 bg-white px-3 text-xs font-medium text-zinc-500"
-        title={`Not eligible for ${game.division_code}. Update your profile.`}
-      >
-        Not eligible
-      </Link>
     );
   }
 
