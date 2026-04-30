@@ -73,6 +73,7 @@ export default async function GamesPage() {
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key)!.push(g);
   }
+  const todayKey = nowIso.slice(0, 10);
 
   return (
     <main className="flex-1 px-4 py-8 sm:px-6">
@@ -103,13 +104,45 @@ export default async function GamesPage() {
           </div>
         )}
 
-        <div className="space-y-6">
-          {[...grouped.entries()].map(([dateKey, dayGames]) => (
-            <section key={dateKey}>
-              <h2 className="sticky top-0 z-10 -mx-4 border-b border-zinc-200 bg-zinc-50/95 px-4 py-2 text-sm font-semibold uppercase tracking-wide text-zinc-600 backdrop-blur sm:mx-0 sm:px-0">
-                {formatGameDate(dayGames[0].starts_at)}
-              </h2>
-              <ul className="mt-3 divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white">
+        <div className="space-y-3">
+          {[...grouped.entries()].map(([dateKey, dayGames]) => {
+            const total = dayGames.length;
+            const openForDay = dayGames.filter((g) => {
+              const filled = assignmentsByGame.get(g.id)?.length ?? 0;
+              return filled < g.ump_slots;
+            }).length;
+            const isToday = dateKey === todayKey;
+            return (
+              <details
+                key={dateKey}
+                open={isToday || openForDay > 0}
+                className="group overflow-hidden rounded-lg border border-zinc-200 bg-white"
+              >
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 select-none hover:bg-zinc-50">
+                  <div className="flex items-center gap-3">
+                    <span className="text-zinc-400 transition-transform group-open:rotate-90">
+                      ▶
+                    </span>
+                    <span className="text-sm font-semibold uppercase tracking-wide text-brand-800">
+                      {formatGameDate(dayGames[0].starts_at)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    {openForDay > 0 ? (
+                      <span className="inline-flex h-6 items-center rounded-full bg-amber-100 px-2 font-semibold text-amber-900">
+                        {openForDay} open
+                      </span>
+                    ) : (
+                      <span className="inline-flex h-6 items-center rounded-full bg-lime-200 px-2 font-semibold text-brand-900">
+                        full
+                      </span>
+                    )}
+                    <span className="inline-flex h-6 items-center rounded-full bg-zinc-100 px-2 font-medium text-zinc-700">
+                      {total} total
+                    </span>
+                  </div>
+                </summary>
+                <ul className="divide-y divide-zinc-200 border-t border-zinc-200">
                 {dayGames.map((g) => {
                   const gameAssignments = assignmentsByGame.get(g.id) ?? [];
                   const filled = gameAssignments.length;
@@ -162,9 +195,10 @@ export default async function GamesPage() {
                     </li>
                   );
                 })}
-              </ul>
-            </section>
-          ))}
+                </ul>
+              </details>
+            );
+          })}
         </div>
       </div>
     </main>
