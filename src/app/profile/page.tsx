@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ensureCurrentUserRow } from "@/lib/users";
-import { updateEligibility } from "./actions";
+import { updateEligibility, updateContact } from "./actions";
 import type { DivisionCode } from "@/lib/db/types";
 
 export const dynamic = "force-dynamic";
@@ -29,27 +29,56 @@ export default async function ProfilePage() {
           </Link>
         </div>
 
-        <section className="mb-6 rounded-lg border border-zinc-200 bg-white p-5">
-          <h2 className="text-base font-bold text-brand-800">Account</h2>
-          <dl className="mt-3 space-y-2 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-zinc-500">Name</dt>
-              <dd className="font-medium">{user.full_name}</dd>
+        <form
+          action={updateContact}
+          className="mb-6 rounded-lg border border-zinc-200 bg-white p-5"
+        >
+          <h2 className="text-base font-bold text-brand-800">Contact info</h2>
+          <p className="mt-1 text-sm text-zinc-600">
+            Phone is required for SMS game confirmations.
+          </p>
+          <div className="mt-4 space-y-3">
+            <label className="block">
+              <span className="text-xs font-semibold text-zinc-700">Name</span>
+              <input
+                type="text"
+                name="full_name"
+                defaultValue={user.full_name}
+                className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-200"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-zinc-700">
+                Phone <span className="text-zinc-400 font-normal">(US)</span>
+              </span>
+              <input
+                type="tel"
+                name="phone"
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="(555) 555-1234"
+                defaultValue={user.phone ?? ""}
+                className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-200"
+              />
+            </label>
+            <div className="flex items-center justify-between text-xs text-zinc-500">
+              <span>Email: {user.email ?? "—"}</span>
+              <span className="uppercase">Role: {user.role}</span>
             </div>
-            <div className="flex justify-between">
-              <dt className="text-zinc-500">Email</dt>
-              <dd className="font-medium">{user.email ?? "—"}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-zinc-500">Phone</dt>
-              <dd className="font-medium">{user.phone ?? "—"}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-zinc-500">Role</dt>
-              <dd className="font-medium uppercase">{user.role}</dd>
-            </div>
-          </dl>
-        </section>
+          </div>
+          <button
+            type="submit"
+            className="mt-5 inline-flex h-10 items-center justify-center rounded-md bg-brand-600 px-4 text-sm font-bold text-white transition-colors hover:bg-brand-700"
+          >
+            Save contact
+          </button>
+        </form>
+
+        {!user.phone && (
+          <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            Add your phone number above so the UIC can text you game confirmations.
+          </div>
+        )}
 
         <form action={updateEligibility} className="rounded-lg border border-zinc-200 bg-white p-5">
           <h2 className="text-base font-bold text-brand-800">
