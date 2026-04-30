@@ -23,10 +23,17 @@ const ACTIVE_STATUSES: Assignment["status"][] = [
   "paid",
 ];
 
-export default async function GamesPage() {
+export default async function GamesPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ view?: string; focus?: string }>;
+}) {
   const { userId } = await auth();
   const user = userId ? await ensureCurrentUserRow() : null;
   const isUic = user?.role === "uic" || user?.role === "admin";
+  const params = (await searchParams) ?? {};
+  const view = params.view === "month" ? "month" : "list";
+  const focus = params.focus ?? null;
 
   const sb = supabaseServer();
   const nowIso = new Date().toISOString();
@@ -80,13 +87,37 @@ export default async function GamesPage() {
   return (
     <main className="flex-1 px-4 py-8 sm:px-6">
       <div className="mx-auto w-full max-w-3xl">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            All games
-          </h1>
-          <p className="mt-1 text-sm text-zinc-600">
-            {games.length} upcoming · {grouped.size} game days
-          </p>
+        <div className="mb-6 flex items-end justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+              All games
+            </h1>
+            <p className="mt-1 text-sm text-zinc-600">
+              {games.length} upcoming · {grouped.size} game days
+            </p>
+          </div>
+          <div className="flex rounded-md border border-zinc-300 bg-white p-0.5 text-xs font-bold">
+            <Link
+              href="/games"
+              className={`inline-flex h-8 items-center rounded px-3 transition-colors ${
+                view === "list"
+                  ? "bg-brand-600 text-white"
+                  : "text-zinc-600 hover:text-zinc-900"
+              }`}
+            >
+              List
+            </Link>
+            <Link
+              href="/games?view=month"
+              className={`inline-flex h-8 items-center rounded px-3 transition-colors ${
+                view === "month"
+                  ? "bg-brand-600 text-white"
+                  : "text-zinc-600 hover:text-zinc-900"
+              }`}
+            >
+              Month
+            </Link>
+          </div>
         </div>
 
         {!user && (
@@ -98,7 +129,11 @@ export default async function GamesPage() {
           </div>
         )}
 
-        <div className="space-y-3">
+        {view === "month" && (
+          <MonthGrid grouped={grouped} assignmentsByGame={assignmentsByGame} />
+        )}
+
+        <div className={`space-y-3 ${view === "month" ? "mt-8" : ""}`}>
           {[...grouped.entries()].map(([dateKey, dayGames]) => {
             const total = dayGames.length;
             const openForDay = dayGames.filter((g) => {
@@ -108,6 +143,8 @@ export default async function GamesPage() {
             return (
               <details
                 key={dateKey}
+                id={`day-${dateKey}`}
+                open={focus === dateKey}
                 className="group overflow-hidden rounded-lg border border-zinc-200 bg-white"
               >
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 select-none hover:bg-zinc-50">
@@ -220,6 +257,143 @@ export default async function GamesPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+function MonthGrid({
+  grouped,
+  assignmentsByGame,
+}: {
+  grouped: Map<string, Game[]>;
+  assignmentsByGame: Map<
+    string,
+    { id: string; status: Assignment["status"] }[]
+  >;
+}) {
+  if (grouped.size === 0) return null;
+  const firstKey = [...grouped.keys()][0];
+  const lastKey = [...grouped.keys()][grouped.size - 1];
+  const first = new Date(firstKey + "T00:00:00Z");
+  const last = new Date(lastKey + "T00:00:00Z");
+
+  // Render each calendar month spanning the season
+  const months: { y: number; m: number }[] = [];
+  const cur = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(last.getUTCFullYear(), last.getUTCMonth(), 1));
+  while (cur <= end) {
+    months.push({ y: cur.getUTCFullYear(), m: cur.getUTCMonth() });
+    cur.setUTCMonth(cur.getUTCMonth() + 1);
+  }
+
+  return (
+    <div className="space-y-6">
+      {months.map(({ y, m }) => (
+        <MonthBlock
+          key={`${y}-${m}`}
+          year={y}
+          month={m}
+          grouped={grouped}
+          assignmentsByGame={assignmentsByGame}
+        />
+      ))}
+    </div>
+  );
+}
+
+function MonthBlock({
+  year,
+  month,
+  grouped,
+  assignmentsByGame,
+}: {
+  year: number;
+  month: number;
+  grouped: Map<string, Game[]>;
+  assignmentsByGame: Map<
+    string,
+    { id: string; status: Assignment["status"] }[]
+  >;
+}) {
+  const monthName = new Date(Date.UTC(year, month, 1)).toLocaleDateString(
+    "en-US",
+    { month: "long", year: "numeric", timeZone: "UTC" }
+  );
+  const firstOfMonth = new Date(Date.UTC(year, month, 1));
+  const startWeekday = firstOfMonth.getUTCDay(); // 0=Sun
+  const lastDayOfMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+
+  const cells: ({ day: number; key: string } | null)[] = [];
+  for (let i = 0; i < startWeekday; i++) cells.push(null);
+  for (let d = 1; d <= lastDayOfMonth; d++) {
+    const dt = new Date(Date.UTC(year, month, d));
+    cells.push({ day: d, key: dt.toISOString().slice(0, 10) });
+  }
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const todayKey = new Date().toISOString().slice(0, 10);
+
+  return (
+    <section className="rounded-lg border border-zinc-200 bg-white">
+      <h2 className="border-b border-zinc-200 px-4 py-2 text-sm font-bold uppercase tracking-wide text-brand-800">
+        {monthName}
+      </h2>
+      <div className="grid grid-cols-7 gap-px border-b border-zinc-200 bg-zinc-100 text-center text-[10px] font-semibold uppercase tracking-wide text-zinc-600">
+        {weekdays.map((d) => (
+          <div key={d} className="bg-white py-1.5">{d}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-px bg-zinc-100">
+        {cells.map((cell, i) => {
+          if (!cell) return <div key={i} className="bg-white aspect-square" />;
+          const dayGames = grouped.get(cell.key) ?? [];
+          const total = dayGames.length;
+          const openForDay = dayGames.filter((g) => {
+            const filled = assignmentsByGame.get(g.id)?.length ?? 0;
+            return filled < g.ump_slots;
+          }).length;
+          const isToday = cell.key === todayKey;
+          const inner = (
+            <div
+              className={`flex h-full flex-col bg-white p-1.5 sm:p-2 ${
+                isToday ? "ring-2 ring-inset ring-brand-600" : ""
+              }`}
+            >
+              <span
+                className={`text-xs font-semibold ${
+                  total > 0 ? "text-zinc-900" : "text-zinc-400"
+                }`}
+              >
+                {cell.day}
+              </span>
+              {total > 0 && (
+                <div className="mt-auto flex flex-col gap-0.5 text-[10px] leading-tight">
+                  <span className="rounded bg-brand-100 px-1 font-bold text-brand-800">
+                    {total} game{total === 1 ? "" : "s"}
+                  </span>
+                  {openForDay > 0 && (
+                    <span className="rounded bg-amber-100 px-1 font-semibold text-amber-900">
+                      {openForDay} open
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+          return (
+            <div key={i} className="aspect-square min-h-12">
+              {total > 0 ? (
+                <Link href={`/games?focus=${cell.key}`} className="block h-full">
+                  {inner}
+                </Link>
+              ) : (
+                inner
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
