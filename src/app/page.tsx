@@ -21,7 +21,7 @@ export default function Home() {
             href="/games"
             className="inline-flex h-11 items-center justify-center rounded-md border border-zinc-300 bg-white px-6 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-100"
           >
-            Open games
+            View schedule
           </Link>
         </div>
       </div>
