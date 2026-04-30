@@ -4,6 +4,19 @@ import { revalidatePath } from "next/cache";
 import { ensureCurrentUserRow } from "@/lib/users";
 import { supabaseServer } from "@/lib/supabase/server";
 import { refreshGameStatus } from "@/lib/db/game-status";
+import { sendPushToUser } from "@/lib/push/send";
+
+function formatGameSummary(g: {
+  division_code: string;
+  team_home: string;
+  starts_at: string;
+  field: string;
+}): string {
+  const d = new Date(g.starts_at);
+  const day = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "UTC" });
+  return `${g.division_code} · ${day} ${time} · ${g.field}`;
+}
 
 async function requireUic() {
   const user = await ensureCurrentUserRow();
@@ -28,10 +41,28 @@ export async function approveRequest(formData: FormData): Promise<void> {
     })
     .eq("id", assignmentId)
     .eq("status", "requested")
-    .select("game_id")
+    .select(
+      "game_id, umpire_id, game:games(division_code, team_home, team_away, field, starts_at)"
+    )
     .single();
   if (error) throw error;
   if (a?.game_id) await refreshGameStatus(a.game_id);
+
+  if (a?.umpire_id && a.game) {
+    const g = a.game as unknown as {
+      division_code: string;
+      team_home: string;
+      team_away: string;
+      field: string;
+      starts_at: string;
+    };
+    await sendPushToUser(a.umpire_id, {
+      title: "Game approved ✅",
+      body: formatGameSummary(g),
+      url: "/dashboard",
+      tag: `approved-${a.game_id}`,
+    });
+  }
 
   revalidatePath("/uic");
   revalidatePath("/games");
@@ -49,10 +80,28 @@ export async function declineRequest(formData: FormData): Promise<void> {
     .update({ status: "declined" })
     .eq("id", assignmentId)
     .eq("status", "requested")
-    .select("game_id")
+    .select(
+      "game_id, umpire_id, game:games(division_code, team_home, team_away, field, starts_at)"
+    )
     .single();
   if (error) throw error;
   if (a?.game_id) await refreshGameStatus(a.game_id);
+
+  if (a?.umpire_id && a.game) {
+    const g = a.game as unknown as {
+      division_code: string;
+      team_home: string;
+      team_away: string;
+      field: string;
+      starts_at: string;
+    };
+    await sendPushToUser(a.umpire_id, {
+      title: "Request declined",
+      body: formatGameSummary(g),
+      url: "/games",
+      tag: `declined-${a.game_id}`,
+    });
+  }
 
   revalidatePath("/uic");
   revalidatePath("/games");

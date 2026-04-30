@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ensureCurrentUserRow } from "@/lib/users";
 import { updateEligibility, updateContact, updateAvatar } from "./actions";
+import PushToggle from "./push-toggle";
 import type { DivisionCode } from "@/lib/db/types";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,18 @@ export default async function ProfilePage() {
             ← Dashboard
           </Link>
         </div>
+
+        <section className="mb-6 rounded-lg border border-zinc-200 bg-white p-5">
+          <h2 className="text-base font-bold text-brand-800">Notifications</h2>
+          <p className="mt-1 text-sm text-zinc-600">
+            Get push alerts when your request is approved or a game is updated.
+            On iPhone you must <strong>Add to Home Screen</strong> first (Share →
+            Add to Home Screen) and open the app from there.
+          </p>
+          <div className="mt-4">
+            <PushToggle />
+          </div>
+        </section>
 
         <form
           action={updateAvatar}

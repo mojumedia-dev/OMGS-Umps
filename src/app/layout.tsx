@@ -12,12 +12,19 @@ const geistSans = Geist({
 export const metadata: Metadata = {
   title: "OMGS Umpire Scheduling",
   description: "Game requests, assignments, and pay tracking for OMGS umpires.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    title: "OMGS Umps",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export const viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  themeColor: "#4a1d6e",
 };
 
 export default function RootLayout({
