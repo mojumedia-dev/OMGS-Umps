@@ -91,6 +91,12 @@ export default async function DashboardPage() {
             {lockedCount} game{lockedCount === 1 ? "" : "s"} on the books
             {requestedCount > 0 ? ` · ${requestedCount} pending UIC` : ""}
           </p>
+          <Link
+            href="/profile"
+            className="mt-2 inline-block text-xs font-semibold text-brand-700 underline-offset-2 hover:underline"
+          >
+            Edit profile · {user.eligible_divisions?.length ?? 0} divisions eligible
+          </Link>
         </div>
 
         <div className={`mb-8 grid gap-3 ${isUic ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>

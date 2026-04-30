@@ -42,6 +42,7 @@ export interface User {
   full_name: string;
   email: string | null;
   phone: string | null;
+  eligible_divisions: DivisionCode[];
   is_active: boolean;
   created_at: string;
   updated_at: string;
