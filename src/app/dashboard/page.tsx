@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { ensureCurrentUserRow } from "@/lib/users";
 import { supabaseServer } from "@/lib/supabase/server";
 import { cancelMyRequest } from "@/app/games/actions";
+import { proposeSwap, acceptSwap, declineSwap, cancelSwap } from "./swap-actions";
 import { LEAGUE_VENUE } from "@/lib/league";
 import {
   formatGameDate,
@@ -25,7 +26,14 @@ export default async function DashboardPage() {
   const nowIso = new Date().toISOString();
   const isUic = user.role === "uic" || user.role === "admin";
 
-  const [{ data: rows, error }, openGamesRes, pendingApprovalsRes, paidRes] = await Promise.all([
+  const [
+    { data: rows, error },
+    openGamesRes,
+    pendingApprovalsRes,
+    paidRes,
+    incomingSwapsRes,
+    umpRosterRes,
+  ] = await Promise.all([
     sb
       .from("assignments")
       .select(
@@ -52,6 +60,29 @@ export default async function DashboardPage() {
       .select("paid_amount, paid_at, game:games(starts_at, division_code)")
       .eq("umpire_id", user.id)
       .eq("status", "paid"),
+    // Swaps targeted at me, awaiting my response
+    sb
+      .from("swap_requests")
+      .select(
+        `id, message, created_at,
+         requester:assignments!swap_requests_assignment_id_fkey (
+           umpire:users!assignments_umpire_id_fkey (id, full_name, avatar_url)
+         ),
+         assignment:assignments (
+           id,
+           game:games (id, division_code, team_home, team_away, field, starts_at, pay_per_slot)
+         )`
+      )
+      .eq("target_umpire_id", user.id)
+      .eq("status", "pending")
+      .order("created_at", { ascending: true }),
+    // Roster of all active umps for the swap target picker
+    sb
+      .from("users")
+      .select("id, full_name, role")
+      .eq("is_active", true)
+      .neq("id", user.id)
+      .order("full_name", { ascending: true }),
   ]);
   type PaidRow = {
     paid_amount: number | null;
@@ -85,6 +116,64 @@ export default async function DashboardPage() {
 
   const openGamesCount = openGamesRes.count ?? 0;
   const pendingApprovalsCount = pendingApprovalsRes.count ?? 0;
+
+  // Outgoing pending swaps (proposed by me) — keyed by assignment id
+  const myAssignmentIds = (
+    ((rows ?? []) as Array<{ id: string }>) ?? []
+  ).map((r) => r.id);
+  const outgoingByAssignment = new Map<
+    string,
+    { id: string; target: { full_name: string | null } | null }
+  >();
+  if (myAssignmentIds.length) {
+    const { data: outgoing } = await sb
+      .from("swap_requests")
+      .select(
+        `id, assignment_id, status,
+         target:users!swap_requests_target_umpire_id_fkey (id, full_name)`
+      )
+      .eq("status", "pending")
+      .in("assignment_id", myAssignmentIds);
+    for (const s of outgoing ?? []) {
+      outgoingByAssignment.set(
+        (s as { assignment_id: string }).assignment_id,
+        s as unknown as {
+          id: string;
+          target: { full_name: string | null } | null;
+        }
+      );
+    }
+  }
+  const umpRoster = (umpRosterRes.data ?? []) as Array<{
+    id: string;
+    full_name: string;
+    role: string;
+  }>;
+  type IncomingSwap = {
+    id: string;
+    message: string | null;
+    created_at: string;
+    requester: {
+      umpire: {
+        id: string;
+        full_name: string;
+        avatar_url: string | null;
+      } | null;
+    } | null;
+    assignment: {
+      id: string;
+      game: {
+        id: string;
+        division_code: string;
+        team_home: string;
+        team_away: string;
+        field: string;
+        starts_at: string;
+        pay_per_slot: number;
+      } | null;
+    } | null;
+  };
+  const incomingSwaps = (incomingSwapsRes.data ?? []) as unknown as IncomingSwap[];
 
   if (error) {
     return (
@@ -190,6 +279,72 @@ export default async function DashboardPage() {
           </Link>
         </div>
 
+        {incomingSwaps.length > 0 && (
+          <section className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <h2 className="text-base font-bold text-amber-900">
+              Swap requests for you
+            </h2>
+            <ul className="mt-3 space-y-3">
+              {incomingSwaps.map((s) => {
+                const g = s.assignment?.game;
+                const requester = s.requester?.umpire;
+                if (!g || !requester) return null;
+                return (
+                  <li
+                    key={s.id}
+                    className="rounded-md border border-amber-200 bg-white p-3"
+                  >
+                    <div className="text-sm font-semibold">
+                      {requester.full_name} → wants you to take their game
+                    </div>
+                    <div className="mt-1 text-xs text-zinc-600">
+                      {g.division_code} ·{" "}
+                      {new Date(g.starts_at).toLocaleString("en-US", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                        hour12: true,
+                        timeZone: "UTC",
+                      })}{" "}
+                      · {g.field} · {formatMoney(g.pay_per_slot)}
+                    </div>
+                    <div className="mt-1 text-xs text-zinc-700">
+                      {g.team_home} vs {g.team_away}
+                    </div>
+                    {s.message && (
+                      <div className="mt-2 rounded bg-amber-100 px-2 py-1 text-xs italic text-amber-900">
+                        &ldquo;{s.message}&rdquo;
+                      </div>
+                    )}
+                    <div className="mt-3 flex gap-2">
+                      <form action={acceptSwap}>
+                        <input type="hidden" name="swapId" value={s.id} />
+                        <button
+                          type="submit"
+                          className="inline-flex h-9 items-center rounded-md bg-lime-400 px-3 text-xs font-bold text-brand-900 hover:bg-lime-500"
+                        >
+                          Accept
+                        </button>
+                      </form>
+                      <form action={declineSwap}>
+                        <input type="hidden" name="swapId" value={s.id} />
+                        <button
+                          type="submit"
+                          className="inline-flex h-9 items-center rounded-md border border-zinc-300 bg-white px-3 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
+                        >
+                          Decline
+                        </button>
+                      </form>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+
         {weeklyEarnings.length > 0 && (
           <section className="mb-6 rounded-lg border border-zinc-200 bg-white p-5">
             <div className="flex items-baseline justify-between">
@@ -274,6 +429,10 @@ export default async function DashboardPage() {
                         : r.status === "approved"
                         ? "Approved"
                         : "Confirmed";
+                    const outSwap = outgoingByAssignment.get(r.id);
+                    const canSwap =
+                      (r.status === "approved" || r.status === "confirmed") &&
+                      !outSwap;
                     return (
                       <li key={r.id} className="px-4 py-3">
                         <div className="flex items-start justify-between gap-3">
@@ -311,6 +470,11 @@ export default async function DashboardPage() {
                             >
                               {label}
                             </span>
+                            {outSwap && (
+                              <span className="inline-flex h-6 items-center rounded-full bg-amber-100 px-2 text-[10px] font-semibold text-amber-900">
+                                Swap → {outSwap.target?.full_name?.split(" ")[0] ?? ""}
+                              </span>
+                            )}
                             {r.status !== "requested" && (
                               <a
                                 href={`/api/calendar/${r.id}`}
@@ -319,15 +483,77 @@ export default async function DashboardPage() {
                                 Add to calendar
                               </a>
                             )}
-                            <form action={cancelMyRequest}>
-                              <input type="hidden" name="assignmentId" value={r.id} />
-                              <button
-                                type="submit"
-                                className="text-xs text-zinc-500 underline-offset-2 hover:text-zinc-700 hover:underline"
-                              >
-                                Cancel
-                              </button>
-                            </form>
+                            {outSwap ? (
+                              <form action={cancelSwap}>
+                                <input type="hidden" name="swapId" value={outSwap.id} />
+                                <button
+                                  type="submit"
+                                  className="text-xs text-zinc-500 underline-offset-2 hover:underline"
+                                >
+                                  Cancel swap
+                                </button>
+                              </form>
+                            ) : (
+                              <>
+                                {canSwap && (
+                                  <details className="text-xs">
+                                    <summary className="cursor-pointer font-semibold text-brand-700 underline-offset-2 hover:underline">
+                                      Swap…
+                                    </summary>
+                                    <form
+                                      action={proposeSwap}
+                                      className="mt-2 flex flex-col items-end gap-1.5 rounded-md border border-zinc-200 bg-zinc-50 p-2"
+                                    >
+                                      <input
+                                        type="hidden"
+                                        name="assignmentId"
+                                        value={r.id}
+                                      />
+                                      <select
+                                        name="targetUmpireId"
+                                        required
+                                        className="h-8 w-44 rounded-md border border-zinc-300 bg-white px-2 text-xs"
+                                        defaultValue=""
+                                      >
+                                        <option value="" disabled>
+                                          Pick an ump
+                                        </option>
+                                        {umpRoster.map((u) => (
+                                          <option key={u.id} value={u.id}>
+                                            {u.full_name}
+                                            {u.role !== "umpire"
+                                              ? ` (${u.role})`
+                                              : ""}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <input
+                                        type="text"
+                                        name="message"
+                                        placeholder="Optional note"
+                                        maxLength={500}
+                                        className="h-8 w-44 rounded-md border border-zinc-300 px-2 text-xs"
+                                      />
+                                      <button
+                                        type="submit"
+                                        className="inline-flex h-8 items-center rounded-md bg-brand-600 px-3 text-xs font-bold text-white hover:bg-brand-700"
+                                      >
+                                        Send swap
+                                      </button>
+                                    </form>
+                                  </details>
+                                )}
+                                <form action={cancelMyRequest}>
+                                  <input type="hidden" name="assignmentId" value={r.id} />
+                                  <button
+                                    type="submit"
+                                    className="text-xs text-zinc-500 underline-offset-2 hover:text-zinc-700 hover:underline"
+                                  >
+                                    Cancel
+                                  </button>
+                                </form>
+                              </>
+                            )}
                           </div>
                         </div>
                       </li>
