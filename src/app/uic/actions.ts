@@ -175,3 +175,42 @@ export async function undoPaid(formData: FormData): Promise<void> {
   revalidatePath("/uic/payouts");
   revalidatePath("/dashboard");
 }
+
+export async function toggleTournament(formData: FormData): Promise<void> {
+  const gameId = String(formData.get("gameId") ?? "");
+  if (!gameId) throw new Error("Missing gameId");
+  await requireUic();
+
+  const sb = supabaseServer();
+  const [{ data: g }, { data: divs }] = await Promise.all([
+    sb
+      .from("games")
+      .select("id, division_code, is_tournament, ump_slots, pay_per_slot")
+      .eq("id", gameId)
+      .single(),
+    sb.from("divisions").select("*"),
+  ]);
+  if (!g || !divs) throw new Error("Game or divisions not found");
+  const div = divs.find((d) => d.code === g.division_code);
+  if (!div) throw new Error("Division not found for game");
+
+  const flipping = !g.is_tournament;
+  const updates = flipping
+    ? {
+        is_tournament: true,
+        ump_slots: div.tournament_ump_slots,
+        pay_per_slot: div.tournament_pay_per_slot,
+      }
+    : {
+        is_tournament: false,
+        ump_slots: div.default_ump_slots,
+        pay_per_slot: div.default_pay_per_slot,
+      };
+
+  const { error } = await sb.from("games").update(updates).eq("id", gameId);
+  if (error) throw error;
+
+  revalidatePath("/games");
+  revalidatePath("/uic");
+  revalidatePath("/dashboard");
+}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { ensureCurrentUserRow } from "@/lib/users";
+import { toggleTournament } from "@/app/uic/actions";
 import {
   formatGameDate,
   formatGameTime,
@@ -24,6 +25,7 @@ const ACTIVE_STATUSES: Assignment["status"][] = [
 export default async function GamesPage() {
   const { userId } = await auth();
   const user = userId ? await ensureCurrentUserRow() : null;
+  const isUic = user?.role === "uic" || user?.role === "admin";
 
   const sb = supabaseServer();
   const nowIso = new Date().toISOString();
@@ -176,8 +178,25 @@ export default async function GamesPage() {
                               </span>
                             ))}
                           </div>
-                          <div className="mt-1.5 text-xs text-zinc-500">
-                            {formatMoney(g.pay_per_slot)}/ump
+                          <div className="mt-1.5 flex items-center gap-2 text-xs text-zinc-500">
+                            <span>{formatMoney(g.pay_per_slot)}/ump</span>
+                            {g.is_tournament && (
+                              <span className="inline-flex h-5 items-center rounded-full bg-lime-200 px-2 text-[10px] font-bold uppercase text-brand-900">
+                                Tournament
+                              </span>
+                            )}
+                            {isUic && (
+                              <form action={toggleTournament} className="inline">
+                                <input type="hidden" name="gameId" value={g.id} />
+                                <button
+                                  type="submit"
+                                  className="text-[11px] underline-offset-2 hover:underline"
+                                  title={g.is_tournament ? "Mark as regular game" : "Mark as tournament"}
+                                >
+                                  {g.is_tournament ? "Unmark tournament" : "Mark tournament"}
+                                </button>
+                              </form>
+                            )}
                           </div>
                         </div>
                         <div className="shrink-0">
