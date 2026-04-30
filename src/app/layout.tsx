@@ -4,6 +4,7 @@ import { Geist } from "next/font/google";
 import { ClerkProvider, UserButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase/server";
+import HeaderMenu from "@/components/HeaderMenu";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -59,8 +60,8 @@ export default async function RootLayout({
         lang="en"
         className={`${geistSans.variable} h-full antialiased`}
       >
-        <body className="min-h-full flex flex-col bg-zinc-50 text-zinc-900">
-          <header className="bg-brand-700 text-white shadow-sm">
+        <body className="min-h-full flex flex-col overflow-x-hidden bg-zinc-50 text-zinc-900">
+          <header className="relative bg-brand-700 text-white shadow-sm">
             <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between px-4 sm:px-6">
               <Link
                 href="/"
@@ -71,65 +72,13 @@ export default async function RootLayout({
                 </span>
                 <span className="text-white">Umps</span>
               </Link>
-              <nav className="flex items-center gap-3 text-sm sm:gap-4">
-                <Link
-                  href="/games"
-                  className="font-medium text-white/85 hover:text-white"
-                >
-                  Schedule
-                </Link>
-                {signedIn ? (
-                  <>
-                    <Link
-                      href="/dashboard"
-                      className="font-medium text-white/85 hover:text-white"
-                    >
-                      My games
-                    </Link>
-                    {showApprovals && (
-                      <Link
-                        href="/uic"
-                        className="font-medium text-white/85 hover:text-white"
-                      >
-                        Approvals
-                      </Link>
-                    )}
-                    {showPayouts && (
-                      <Link
-                        href="/uic/payouts"
-                        className="font-medium text-white/85 hover:text-white"
-                      >
-                        Payouts
-                      </Link>
-                    )}
-                    {showAudit && (
-                      <Link
-                        href="/audit"
-                        className="font-medium text-white/85 hover:text-white"
-                      >
-                        Audit
-                      </Link>
-                    )}
-                    <Link
-                      href="/profile"
-                      className="font-medium text-white/85 hover:text-white"
-                    >
-                      Profile
-                    </Link>
-                    <span className="hidden text-[10px] text-white/40 sm:inline">
-                      [{role ?? "—"}]
-                    </span>
-                    <UserButton />
-                  </>
-                ) : (
-                  <Link
-                    href="/sign-in"
-                    className="inline-flex h-8 items-center justify-center rounded-md bg-lime-400 px-3 text-xs font-bold text-brand-900 hover:bg-lime-500"
-                  >
-                    Sign in
-                  </Link>
-                )}
-              </nav>
+              <HeaderMenu
+                signedIn={signedIn}
+                showApprovals={showApprovals}
+                showPayouts={showPayouts}
+                showAudit={showAudit}
+                userButton={<UserButton />}
+              />
             </div>
           </header>
           {children}
