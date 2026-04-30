@@ -14,7 +14,7 @@ function csvEscape(v: string | number | null | undefined): string {
 export async function GET(req: Request) {
   const user = await ensureCurrentUserRow();
   if (!user) return new NextResponse("Unauthorized", { status: 401 });
-  if (user.role !== "uic" && user.role !== "admin")
+  if (user.role !== "board" && user.role !== "admin")
     return new NextResponse("Forbidden", { status: 403 });
 
   const url = new URL(req.url);
