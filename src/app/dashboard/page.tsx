@@ -21,17 +21,34 @@ export default async function DashboardPage() {
 
   const sb = supabaseServer();
   const nowIso = new Date().toISOString();
+  const isUic = user.role === "uic" || user.role === "admin";
 
-  const { data: rows, error } = await sb
-    .from("assignments")
-    .select(
-      `id, status, paid_amount,
-       game:games (id, division_code, team_home, team_away, field,
-                   starts_at, ends_at, ump_slots, pay_per_slot)`
-    )
-    .eq("umpire_id", user.id)
-    .in("status", ["requested", "approved", "confirmed"])
-    .order("game(starts_at)", { ascending: true });
+  const [{ data: rows, error }, openGamesRes, pendingApprovalsRes] = await Promise.all([
+    sb
+      .from("assignments")
+      .select(
+        `id, status, paid_amount,
+         game:games (id, division_code, team_home, team_away, field,
+                     starts_at, ends_at, ump_slots, pay_per_slot)`
+      )
+      .eq("umpire_id", user.id)
+      .in("status", ["requested", "approved", "confirmed"])
+      .order("game(starts_at)", { ascending: true }),
+    sb
+      .from("games")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "open")
+      .gte("starts_at", nowIso),
+    isUic
+      ? sb
+          .from("assignments")
+          .select("*", { count: "exact", head: true })
+          .eq("status", "requested")
+      : Promise.resolve({ count: 0 } as { count: number | null }),
+  ]);
+
+  const openGamesCount = openGamesRes.count ?? 0;
+  const pendingApprovalsCount = pendingApprovalsRes.count ?? 0;
 
   if (error) {
     return (
@@ -76,21 +93,58 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        <div className="mb-6 flex flex-wrap gap-2">
+        <div className={`mb-8 grid gap-3 ${isUic ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
           <Link
             href="/games"
-            className="inline-flex h-10 items-center justify-center rounded-md bg-brand-600 px-4 text-sm font-bold text-white transition-colors hover:bg-brand-700"
+            className="group flex items-center justify-between rounded-xl bg-brand-600 px-4 py-4 text-white shadow-sm transition-colors hover:bg-brand-700"
           >
-            Browse open games
+            <div>
+              <div className="text-base font-bold">Browse games</div>
+              <div className="mt-0.5 text-xs text-white/80">
+                {openGamesCount} open
+              </div>
+            </div>
+            <span className="text-xl transition-transform group-hover:translate-x-0.5">
+              →
+            </span>
           </Link>
-          {(user.role === "uic" || user.role === "admin") && (
+
+          {isUic && (
             <Link
               href="/uic"
-              className="inline-flex h-10 items-center justify-center rounded-md bg-lime-400 px-4 text-sm font-bold text-brand-900 transition-colors hover:bg-lime-500"
+              className="group relative flex items-center justify-between rounded-xl bg-lime-400 px-4 py-4 text-brand-900 shadow-sm transition-colors hover:bg-lime-500"
             >
-              UIC approvals
+              <div>
+                <div className="text-base font-bold">Pending approvals</div>
+                <div className="mt-0.5 text-xs text-brand-900/80">
+                  {pendingApprovalsCount} awaiting you
+                </div>
+              </div>
+              {pendingApprovalsCount > 0 && (
+                <span className="absolute -right-1 -top-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-brand-700 px-1.5 text-xs font-bold text-white">
+                  {pendingApprovalsCount}
+                </span>
+              )}
+              <span className="text-xl transition-transform group-hover:translate-x-0.5">
+                →
+              </span>
             </Link>
           )}
+
+          <Link
+            href="#my-games"
+            className="group flex items-center justify-between rounded-xl border-2 border-brand-200 bg-white px-4 py-4 text-brand-800 transition-colors hover:bg-brand-50"
+          >
+            <div>
+              <div className="text-base font-bold">My games</div>
+              <div className="mt-0.5 text-xs text-brand-700/70">
+                {upcoming?.length ?? 0} upcoming
+              </div>
+            </div>
+            <span className="text-xl transition-transform group-hover:translate-x-0.5">
+              ↓
+            </span>
+          </Link>
         </div>
 
         {upcoming.length === 0 ? (
@@ -106,7 +160,7 @@ export default async function DashboardPage() {
             </Link>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div id="my-games" className="space-y-6 scroll-mt-20">
             <h2 className="text-base font-semibold">Your upcoming games</h2>
             {[...grouped.entries()].map(([dateKey, items]) => (
               <section key={dateKey}>
