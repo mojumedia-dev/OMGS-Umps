@@ -50,7 +50,7 @@ export default async function UicQueuePage() {
       `id, requested_at,
        game:games (id, division_code, team_home, team_away, field,
                    starts_at, ends_at, ump_slots, pay_per_slot, status),
-       umpire:users (id, full_name, email, phone)`
+       umpire:users!assignments_umpire_id_fkey (id, full_name, email, phone)`
     )
     .eq("status", "requested")
     .order("requested_at", { ascending: true });
