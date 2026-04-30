@@ -26,6 +26,14 @@ async function requireUic() {
   return user;
 }
 
+async function requireBoard() {
+  const user = await ensureCurrentUserRow();
+  if (!user) throw new Error("Not signed in");
+  if (user.role !== "board" && user.role !== "admin")
+    throw new Error("Board access required");
+  return user;
+}
+
 export async function approveRequest(formData: FormData): Promise<void> {
   const assignmentId = String(formData.get("assignmentId") ?? "");
   if (!assignmentId) throw new Error("Missing assignmentId");
@@ -114,7 +122,7 @@ export async function markPaid(formData: FormData): Promise<void> {
   const amount = Number(amountRaw);
   if (!Number.isFinite(amount) || amount < 0) throw new Error("Invalid amount");
 
-  const uic = await requireUic();
+  const board = await requireBoard();
   const sb = supabaseServer();
   const { data: a, error } = await sb
     .from("assignments")
@@ -122,7 +130,7 @@ export async function markPaid(formData: FormData): Promise<void> {
       status: "paid",
       paid_at: new Date().toISOString(),
       paid_amount: amount,
-      paid_by: uic.id,
+      paid_by: board.id,
     })
     .eq("id", assignmentId)
     .in("status", ["approved", "confirmed", "completed"])
@@ -156,7 +164,7 @@ export async function markPaid(formData: FormData): Promise<void> {
 export async function undoPaid(formData: FormData): Promise<void> {
   const assignmentId = String(formData.get("assignmentId") ?? "");
   if (!assignmentId) throw new Error("Missing assignmentId");
-  await requireUic();
+  await requireBoard();
 
   const sb = supabaseServer();
   const { error } = await sb

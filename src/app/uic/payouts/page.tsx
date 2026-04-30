@@ -25,9 +25,8 @@ type Row = {
 export default async function PayoutsPage() {
   const user = await ensureCurrentUserRow();
   if (!user) redirect("/sign-in");
-  if (user.role !== "uic" && user.role !== "admin" && user.role !== "board")
-    redirect("/dashboard");
-  const canEdit = user.role === "uic" || user.role === "admin";
+  if (user.role !== "board" && user.role !== "admin") redirect("/dashboard");
+  const canEdit = user.role === "board" || user.role === "admin";
 
   const sb = supabaseServer();
   const nowIso = new Date().toISOString();

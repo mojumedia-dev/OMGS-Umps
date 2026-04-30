@@ -29,6 +29,8 @@ export const viewport = {
   themeColor: "#4a1d6e",
 };
 
+export const dynamic = "force-dynamic";
+
 async function currentUserRole(): Promise<string | null> {
   const { userId } = await auth();
   if (!userId) return null;
@@ -47,7 +49,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const role = await currentUserRole();
-  const showPayouts = role === "uic" || role === "admin" || role === "board";
+  const showPayouts = role === "board" || role === "admin";
   const showApprovals = role === "uic" || role === "admin";
 
   return (
