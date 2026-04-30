@@ -1,32 +1,69 @@
 import Link from "next/link";
+import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase/server";
+import { ensureCurrentUserRow } from "@/lib/users";
 import {
   formatGameDate,
   formatGameTime,
   formatGameDateKey,
   formatMoney,
 } from "@/lib/format";
-import type { Game } from "@/lib/db/types";
+import type { Game, Assignment } from "@/lib/db/types";
+import { requestGame, cancelMyRequest } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function GamesPage() {
-  const sb = supabaseServer();
-  const { data, error } = await sb
-    .from("games")
-    .select("*")
-    .order("starts_at", { ascending: true })
-    .limit(500);
+const ACTIVE_STATUSES: Assignment["status"][] = [
+  "requested",
+  "approved",
+  "confirmed",
+  "completed",
+  "paid",
+];
 
-  if (error) {
+export default async function GamesPage() {
+  const { userId } = await auth();
+  const user = userId ? await ensureCurrentUserRow() : null;
+
+  const sb = supabaseServer();
+  const nowIso = new Date().toISOString();
+
+  const [{ data: gamesData, error: gamesErr }, { data: allActive, error: assnErr }] = await Promise.all([
+    sb
+      .from("games")
+      .select("*")
+      .gte("starts_at", nowIso)
+      .order("starts_at", { ascending: true })
+      .limit(500),
+    sb
+      .from("assignments")
+      .select("id, game_id, umpire_id, status")
+      .in("status", ACTIVE_STATUSES),
+  ]);
+
+  if (gamesErr || assnErr) {
     return (
       <main className="flex-1 px-6 py-10">
-        <p className="text-red-600">Failed to load games: {error.message}</p>
+        <p className="text-red-600">
+          Failed to load: {gamesErr?.message ?? assnErr?.message}
+        </p>
       </main>
     );
   }
 
-  const games = (data ?? []) as Game[];
+  const games = (gamesData ?? []) as Game[];
+  const assignments = (allActive ?? []) as Pick<
+    Assignment,
+    "id" | "game_id" | "umpire_id" | "status"
+  >[];
+
+  const filledCountByGame = new Map<string, number>();
+  const myAssignmentByGame = new Map<string, (typeof assignments)[number]>();
+  for (const a of assignments) {
+    filledCountByGame.set(a.game_id, (filledCountByGame.get(a.game_id) ?? 0) + 1);
+    if (user && a.umpire_id === user.id) myAssignmentByGame.set(a.game_id, a);
+  }
+
   const grouped = new Map<string, Game[]>();
   for (const g of games) {
     const key = formatGameDateKey(g.starts_at);
@@ -40,19 +77,28 @@ export default async function GamesPage() {
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              Schedule
+              Open games
             </h1>
             <p className="mt-1 text-sm text-zinc-600">
-              {games.length} games · {grouped.size} game days
+              {games.length} upcoming · {grouped.size} game days
             </p>
           </div>
           <Link
-            href="/"
+            href={user ? "/dashboard" : "/"}
             className="text-sm font-medium text-zinc-600 hover:text-zinc-900"
           >
-            ← Home
+            ← {user ? "Dashboard" : "Home"}
           </Link>
         </div>
+
+        {!user && (
+          <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm">
+            <Link href="/sign-in" className="font-medium text-amber-900 underline">
+              Sign in
+            </Link>{" "}
+            <span className="text-amber-800">to request games.</span>
+          </div>
+        )}
 
         <div className="space-y-6">
           {[...grouped.entries()].map(([dateKey, dayGames]) => (
@@ -61,42 +107,121 @@ export default async function GamesPage() {
                 {formatGameDate(dayGames[0].starts_at)}
               </h2>
               <ul className="mt-3 divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white">
-                {dayGames.map((g) => (
-                  <li key={g.id} className="px-4 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex h-5 items-center rounded bg-zinc-900 px-1.5 text-[11px] font-bold text-white">
-                            {g.division_code}
-                          </span>
-                          <span className="text-sm text-zinc-500">
-                            {formatGameTime(g.starts_at)} · {g.field}
-                          </span>
+                {dayGames.map((g) => {
+                  const filled = filledCountByGame.get(g.id) ?? 0;
+                  const remaining = g.ump_slots - filled;
+                  const mine = myAssignmentByGame.get(g.id);
+                  return (
+                    <li key={g.id} className="px-4 py-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex h-5 items-center rounded bg-zinc-900 px-1.5 text-[11px] font-bold text-white">
+                              {g.division_code}
+                            </span>
+                            <span className="text-sm text-zinc-500">
+                              {formatGameTime(g.starts_at)} · {g.field}
+                            </span>
+                          </div>
+                          <div className="mt-1.5 truncate text-sm font-medium text-zinc-900">
+                            {g.team_home}
+                          </div>
+                          <div className="truncate text-sm text-zinc-700">
+                            vs {g.team_away}
+                          </div>
+                          <div className="mt-1.5 text-xs text-zinc-500">
+                            {filled}/{g.ump_slots} filled · {formatMoney(g.pay_per_slot)}/ump
+                          </div>
                         </div>
-                        <div className="mt-1.5 truncate text-sm font-medium text-zinc-900">
-                          {g.team_home}
-                        </div>
-                        <div className="truncate text-sm text-zinc-700">
-                          vs {g.team_away}
+                        <div className="shrink-0">
+                          <GameAction
+                            user={user}
+                            game={g}
+                            mine={mine}
+                            remaining={remaining}
+                          />
                         </div>
                       </div>
-                      <div className="shrink-0 text-right">
-                        <div className="text-xs uppercase tracking-wide text-zinc-500">
-                          Pay
-                        </div>
-                        <div className="text-sm font-semibold text-zinc-900">
-                          {formatMoney(g.pay_per_slot)}
-                          {g.ump_slots > 1 ? ` × ${g.ump_slots}` : ""}
-                        </div>
-                      </div>
-                    </div>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
             </section>
           ))}
         </div>
       </div>
     </main>
+  );
+}
+
+function GameAction({
+  user,
+  game,
+  mine,
+  remaining,
+}: {
+  user: { id: string } | null;
+  game: Game;
+  mine: { id: string; status: Assignment["status"] } | undefined;
+  remaining: number;
+}) {
+  if (!user) {
+    return (
+      <Link
+        href="/sign-in"
+        className="inline-flex h-9 items-center justify-center rounded-md border border-zinc-300 px-3 text-xs font-medium text-zinc-700"
+      >
+        Sign in
+      </Link>
+    );
+  }
+
+  if (mine) {
+    const label =
+      mine.status === "requested"
+        ? "Requested"
+        : mine.status === "approved"
+        ? "Approved"
+        : mine.status === "confirmed"
+        ? "Confirmed"
+        : mine.status;
+    const tone =
+      mine.status === "requested"
+        ? "bg-amber-100 text-amber-900"
+        : "bg-emerald-100 text-emerald-900";
+    return (
+      <form action={cancelMyRequest} className="flex flex-col items-end gap-1">
+        <span className={`inline-flex h-7 items-center rounded-md px-2 text-xs font-semibold ${tone}`}>
+          {label}
+        </span>
+        <input type="hidden" name="assignmentId" value={mine.id} />
+        <button
+          type="submit"
+          className="text-xs text-zinc-500 underline-offset-2 hover:text-zinc-700 hover:underline"
+        >
+          Cancel
+        </button>
+      </form>
+    );
+  }
+
+  if (remaining <= 0) {
+    return (
+      <span className="inline-flex h-9 items-center justify-center rounded-md bg-zinc-100 px-3 text-xs font-medium text-zinc-500">
+        Full
+      </span>
+    );
+  }
+
+  return (
+    <form action={requestGame}>
+      <input type="hidden" name="gameId" value={game.id} />
+      <button
+        type="submit"
+        className="inline-flex h-9 items-center justify-center rounded-md bg-zinc-900 px-3 text-xs font-semibold text-white transition-colors hover:bg-zinc-800"
+      >
+        Request
+      </button>
+    </form>
   );
 }
