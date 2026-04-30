@@ -16,6 +16,13 @@ export const metadata: Metadata = {
   title: "OMGS Umpire Scheduling",
   description: "Game requests, assignments, and pay tracking for OMGS umpires.",
   manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
   appleWebApp: {
     capable: true,
     title: "OMGS Umps",
@@ -67,9 +74,14 @@ export default async function RootLayout({
                 href="/"
                 className="flex items-center gap-2 text-sm font-bold tracking-tight"
               >
-                <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-lime-400 text-[10px] font-extrabold text-brand-900">
-                  OMGS
-                </span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/logo.png"
+                  alt="OMGS"
+                  width={36}
+                  height={36}
+                  className="h-9 w-9 rounded-md bg-white object-contain p-0.5"
+                />
                 <span className="text-white">Umps</span>
               </Link>
               <HeaderMenu
