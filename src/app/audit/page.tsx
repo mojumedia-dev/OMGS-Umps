@@ -22,6 +22,16 @@ const ACTION_LABELS: Record<string, { label: string; tone: string }> = {
   swap_execute: { label: "Swap executed", tone: "bg-brand-200 text-brand-900" },
 };
 
+const FILTER_GROUPS: { label: string; actions: string[] }[] = [
+  { label: "Requests", actions: ["request", "cancel"] },
+  { label: "UIC", actions: ["approve", "decline", "tournament_toggle"] },
+  { label: "Pay", actions: ["pay", "unpay"] },
+  {
+    label: "Swaps",
+    actions: ["swap_propose", "swap_accept", "swap_decline", "swap_cancel", "swap_execute"],
+  },
+];
+
 type Row = {
   id: string;
   action: string;
@@ -38,18 +48,24 @@ type Row = {
   } | null;
 };
 
-export default async function AuditPage() {
+export default async function AuditPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ action?: string; group?: string; from?: string; to?: string }>;
+}) {
   const user = await ensureCurrentUserRow();
   if (!user) redirect("/sign-in");
-  if (
-    user.role !== "uic" &&
-    user.role !== "admin" &&
-    user.role !== "board"
-  )
+  if (user.role !== "uic" && user.role !== "admin" && user.role !== "board")
     redirect("/dashboard");
 
+  const params = (await searchParams) ?? {};
+  const action = params.action ?? "";
+  const group = params.group ?? "";
+  const from = params.from ?? "";
+  const to = params.to ?? "";
+
   const sb = supabaseServer();
-  const { data, error } = await sb
+  let query = sb
     .from("audit_log")
     .select(
       `id, action, created_at, details,
@@ -58,7 +74,18 @@ export default async function AuditPage() {
        game:games (division_code, team_home, team_away, starts_at, field)`
     )
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(500);
+
+  if (action) {
+    query = query.eq("action", action);
+  } else if (group) {
+    const g = FILTER_GROUPS.find((g) => g.label === group);
+    if (g) query = query.in("action", g.actions);
+  }
+  if (from) query = query.gte("created_at", `${from}T00:00:00Z`);
+  if (to) query = query.lte("created_at", `${to}T23:59:59Z`);
+
+  const { data, error } = await query;
 
   if (error) {
     return (
@@ -73,18 +100,88 @@ export default async function AuditPage() {
   return (
     <main className="flex-1 px-4 py-8 sm:px-6">
       <div className="mx-auto w-full max-w-3xl">
-        <div className="mb-6">
+        <div className="mb-4">
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
             Audit log
           </h1>
           <p className="mt-1 text-sm text-zinc-600">
-            Last {rows.length} events. Most recent first.
+            {rows.length} event{rows.length === 1 ? "" : "s"} · most recent first
           </p>
         </div>
 
+        <form
+          method="GET"
+          className="mb-6 grid grid-cols-1 gap-3 rounded-lg border border-zinc-200 bg-white p-4 sm:grid-cols-4"
+        >
+          <label className="block">
+            <span className="text-xs font-semibold text-zinc-700">Group</span>
+            <select
+              name="group"
+              defaultValue={group}
+              className="mt-1 h-9 w-full rounded-md border border-zinc-300 bg-white px-2 text-sm"
+            >
+              <option value="">All groups</option>
+              {FILTER_GROUPS.map((g) => (
+                <option key={g.label} value={g.label}>
+                  {g.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-zinc-700">Action</span>
+            <select
+              name="action"
+              defaultValue={action}
+              className="mt-1 h-9 w-full rounded-md border border-zinc-300 bg-white px-2 text-sm"
+            >
+              <option value="">All actions</option>
+              {Object.entries(ACTION_LABELS).map(([key, meta]) => (
+                <option key={key} value={key}>
+                  {meta.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-zinc-700">From</span>
+            <input
+              type="date"
+              name="from"
+              defaultValue={from}
+              className="mt-1 h-9 w-full rounded-md border border-zinc-300 bg-white px-2 text-sm"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-zinc-700">To</span>
+            <input
+              type="date"
+              name="to"
+              defaultValue={to}
+              className="mt-1 h-9 w-full rounded-md border border-zinc-300 bg-white px-2 text-sm"
+            />
+          </label>
+          <div className="sm:col-span-4 flex items-center gap-2">
+            <button
+              type="submit"
+              className="inline-flex h-9 items-center rounded-md bg-brand-600 px-4 text-xs font-bold text-white hover:bg-brand-700"
+            >
+              Apply
+            </button>
+            {(action || group || from || to) && (
+              <a
+                href="/audit"
+                className="inline-flex h-9 items-center text-xs font-semibold text-zinc-600 underline-offset-2 hover:underline"
+              >
+                Clear
+              </a>
+            )}
+          </div>
+        </form>
+
         {rows.length === 0 ? (
           <div className="rounded-lg border border-dashed border-zinc-300 bg-white p-8 text-center">
-            <p className="text-sm text-zinc-700">No events yet.</p>
+            <p className="text-sm text-zinc-700">No events match the filters.</p>
           </div>
         ) : (
           <ul className="divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white">
