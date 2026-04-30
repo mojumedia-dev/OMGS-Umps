@@ -301,6 +301,14 @@ export default async function DashboardPage() {
                             >
                               {label}
                             </span>
+                            {r.status !== "requested" && (
+                              <a
+                                href={`/api/calendar/${r.id}`}
+                                className="text-xs font-semibold text-brand-700 underline-offset-2 hover:underline"
+                              >
+                                Add to calendar
+                              </a>
+                            )}
                             <form action={cancelMyRequest}>
                               <input type="hidden" name="assignmentId" value={r.id} />
                               <button
