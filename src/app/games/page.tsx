@@ -73,7 +73,6 @@ export default async function GamesPage() {
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key)!.push(g);
   }
-  const todayKey = nowIso.slice(0, 10);
 
   return (
     <main className="flex-1 px-4 py-8 sm:px-6">
@@ -111,11 +110,9 @@ export default async function GamesPage() {
               const filled = assignmentsByGame.get(g.id)?.length ?? 0;
               return filled < g.ump_slots;
             }).length;
-            const isToday = dateKey === todayKey;
             return (
               <details
                 key={dateKey}
-                open={isToday || openForDay > 0}
                 className="group overflow-hidden rounded-lg border border-zinc-200 bg-white"
               >
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 select-none hover:bg-zinc-50">
