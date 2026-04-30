@@ -163,7 +163,7 @@ export default async function DashboardPage() {
               href="/games"
               className="mt-3 inline-flex text-sm font-semibold text-zinc-900 underline-offset-2 hover:underline"
             >
-              View open games →
+              View all games →
             </Link>
           </div>
         ) : (
