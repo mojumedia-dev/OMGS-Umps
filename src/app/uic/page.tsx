@@ -17,7 +17,7 @@ type RequestRow = {
   id: string;
   requested_at: string;
   game: Game | null;
-  umpire: Pick<User, "id" | "full_name" | "email" | "phone"> | null;
+  umpire: Pick<User, "id" | "full_name" | "email" | "phone" | "avatar_url"> | null;
 };
 
 export default async function UicQueuePage() {
@@ -50,7 +50,7 @@ export default async function UicQueuePage() {
       `id, requested_at,
        game:games (id, division_code, team_home, team_away, field,
                    starts_at, ends_at, ump_slots, pay_per_slot, status),
-       umpire:users!assignments_umpire_id_fkey (id, full_name, email, phone)`
+       umpire:users!assignments_umpire_id_fkey (id, full_name, email, phone, avatar_url)`
     )
     .eq("status", "requested")
     .order("requested_at", { ascending: true });
@@ -124,15 +124,29 @@ export default async function UicQueuePage() {
                             <div className="mt-1 truncate text-sm font-medium text-zinc-900">
                               {g.team_home} vs {g.team_away}
                             </div>
-                            <div className="mt-2 flex items-center gap-2 text-sm">
-                              <span className="font-semibold text-zinc-900">
-                                {r.umpire?.full_name ?? "Unknown ump"}
-                              </span>
-                              {r.umpire?.phone && (
-                                <span className="text-xs text-zinc-500">
-                                  {r.umpire.phone}
+                            <div className="mt-2 flex items-center gap-2.5 text-sm">
+                              {r.umpire?.avatar_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={r.umpire.avatar_url}
+                                  alt=""
+                                  className="h-9 w-9 shrink-0 rounded-full object-cover ring-2 ring-brand-200"
+                                />
+                              ) : (
+                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-700 ring-2 ring-brand-200">
+                                  {(r.umpire?.full_name ?? "U").trim().charAt(0).toUpperCase()}
                                 </span>
                               )}
+                              <div className="min-w-0">
+                                <div className="truncate font-semibold text-zinc-900">
+                                  {r.umpire?.full_name ?? "Unknown ump"}
+                                </div>
+                                {r.umpire?.phone && (
+                                  <div className="text-xs text-zinc-500">
+                                    {r.umpire.phone}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                           <div className="flex shrink-0 gap-2">

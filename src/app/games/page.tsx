@@ -38,7 +38,7 @@ export default async function GamesPage() {
     sb
       .from("assignments")
       .select(
-        "id, game_id, umpire_id, status, umpire:users!assignments_umpire_id_fkey(full_name)"
+        "id, game_id, umpire_id, status, umpire:users!assignments_umpire_id_fkey(full_name, avatar_url)"
       )
       .in("status", ACTIVE_STATUSES),
   ]);
@@ -55,7 +55,7 @@ export default async function GamesPage() {
 
   const games = (gamesData ?? []) as Game[];
   type AssignmentRow = Pick<Assignment, "id" | "game_id" | "umpire_id" | "status"> & {
-    umpire: { full_name: string } | null;
+    umpire: { full_name: string; avatar_url: string | null } | null;
   };
   const assignments = (allActive ?? []) as unknown as AssignmentRow[];
 
@@ -205,7 +205,10 @@ export default async function GamesPage() {
 function UmpPill({
   a,
 }: {
-  a: { status: Assignment["status"]; umpire: { full_name: string } | null };
+  a: {
+    status: Assignment["status"];
+    umpire: { full_name: string; avatar_url: string | null } | null;
+  };
 }) {
   const name = a.umpire?.full_name ?? "Umpire";
   const display =
@@ -216,15 +219,57 @@ function UmpPill({
     a.status === "requested"
       ? "border-amber-300 bg-amber-50 text-amber-900"
       : "border-brand-200 bg-lime-100 text-brand-900";
-  const dot =
-    a.status === "requested" ? "bg-amber-400" : "bg-lime-500";
+  const ringTone =
+    a.status === "requested" ? "ring-amber-300" : "ring-lime-500";
+
   return (
     <span
-      className={`inline-flex h-6 items-center gap-1 rounded-full border px-2 text-[11px] font-semibold ${tone}`}
+      className={`inline-flex h-7 items-center gap-1.5 rounded-full border pl-0.5 pr-2.5 text-[11px] font-semibold ${tone}`}
       title={`${name} · ${a.status}`}
     >
-      <span className={`inline-block h-1.5 w-1.5 rounded-full ${dot}`} />
+      <Avatar
+        url={a.umpire?.avatar_url ?? null}
+        name={name}
+        size={24}
+        ring={ringTone}
+      />
       {display}
+    </span>
+  );
+}
+
+function Avatar({
+  url,
+  name,
+  size,
+  ring,
+}: {
+  url: string | null;
+  name: string;
+  size: number;
+  ring?: string;
+}) {
+  const initial = (name || "U").trim().charAt(0).toUpperCase();
+  const ringClass = ring ? `ring-2 ${ring}` : "";
+  if (url) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={url}
+        alt=""
+        width={size}
+        height={size}
+        className={`shrink-0 rounded-full object-cover ${ringClass}`}
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+  return (
+    <span
+      className={`flex shrink-0 items-center justify-center rounded-full bg-brand-200 text-[10px] font-bold text-brand-800 ${ringClass}`}
+      style={{ width: size, height: size }}
+    >
+      {initial}
     </span>
   );
 }
