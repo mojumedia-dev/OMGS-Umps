@@ -106,3 +106,72 @@ export async function declineRequest(formData: FormData): Promise<void> {
   revalidatePath("/uic");
   revalidatePath("/games");
 }
+
+export async function markPaid(formData: FormData): Promise<void> {
+  const assignmentId = String(formData.get("assignmentId") ?? "");
+  const amountRaw = String(formData.get("amount") ?? "");
+  if (!assignmentId) throw new Error("Missing assignmentId");
+  const amount = Number(amountRaw);
+  if (!Number.isFinite(amount) || amount < 0) throw new Error("Invalid amount");
+
+  const uic = await requireUic();
+  const sb = supabaseServer();
+  const { data: a, error } = await sb
+    .from("assignments")
+    .update({
+      status: "paid",
+      paid_at: new Date().toISOString(),
+      paid_amount: amount,
+      paid_by: uic.id,
+    })
+    .eq("id", assignmentId)
+    .in("status", ["approved", "confirmed", "completed"])
+    .select(
+      "umpire_id, game_id, game:games(division_code, team_home, team_away, field, starts_at)"
+    )
+    .maybeSingle();
+  if (error) throw error;
+
+  if (a?.umpire_id && a.game) {
+    const g = a.game as unknown as {
+      division_code: string;
+      team_home: string;
+      team_away: string;
+      field: string;
+      starts_at: string;
+    };
+    await sendPushToUser(a.umpire_id, {
+      title: `Paid $${amount} 💵`,
+      body: formatGameSummary(g),
+      url: "/dashboard",
+      tag: `paid-${a.game_id}`,
+    });
+  }
+
+  revalidatePath("/uic");
+  revalidatePath("/uic/payouts");
+  revalidatePath("/dashboard");
+}
+
+export async function undoPaid(formData: FormData): Promise<void> {
+  const assignmentId = String(formData.get("assignmentId") ?? "");
+  if (!assignmentId) throw new Error("Missing assignmentId");
+  await requireUic();
+
+  const sb = supabaseServer();
+  const { error } = await sb
+    .from("assignments")
+    .update({
+      status: "approved",
+      paid_at: null,
+      paid_amount: null,
+      paid_by: null,
+    })
+    .eq("id", assignmentId)
+    .eq("status", "paid");
+  if (error) throw error;
+
+  revalidatePath("/uic");
+  revalidatePath("/uic/payouts");
+  revalidatePath("/dashboard");
+}

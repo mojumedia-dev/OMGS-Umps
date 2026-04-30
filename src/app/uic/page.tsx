@@ -84,12 +84,20 @@ export default async function UicQueuePage() {
               {requests.length} awaiting your review
             </p>
           </div>
-          <Link
-            href="/dashboard"
-            className="text-sm font-medium text-zinc-600 hover:text-zinc-900"
-          >
-            ← Dashboard
-          </Link>
+          <div className="flex gap-3 text-sm">
+            <Link
+              href="/uic/payouts"
+              className="font-medium text-brand-700 hover:text-brand-900"
+            >
+              Payouts →
+            </Link>
+            <Link
+              href="/dashboard"
+              className="font-medium text-zinc-600 hover:text-zinc-900"
+            >
+              ← Dashboard
+            </Link>
+          </div>
         </div>
 
         {requests.length === 0 ? (

@@ -24,7 +24,7 @@ export default async function DashboardPage() {
   const nowIso = new Date().toISOString();
   const isUic = user.role === "uic" || user.role === "admin";
 
-  const [{ data: rows, error }, openGamesRes, pendingApprovalsRes] = await Promise.all([
+  const [{ data: rows, error }, openGamesRes, pendingApprovalsRes, paidRes] = await Promise.all([
     sb
       .from("assignments")
       .select(
@@ -46,7 +46,16 @@ export default async function DashboardPage() {
           .select("*", { count: "exact", head: true })
           .eq("status", "requested")
       : Promise.resolve({ count: 0 } as { count: number | null }),
+    sb
+      .from("assignments")
+      .select("paid_amount")
+      .eq("umpire_id", user.id)
+      .eq("status", "paid"),
   ]);
+  const totalEarned = (paidRes.data ?? []).reduce(
+    (s: number, r: { paid_amount: number | null }) => s + (r.paid_amount ?? 0),
+    0
+  );
 
   const openGamesCount = openGamesRes.count ?? 0;
   const pendingApprovalsCount = pendingApprovalsRes.count ?? 0;
@@ -91,6 +100,7 @@ export default async function DashboardPage() {
           <p className="mt-1 text-sm text-zinc-600">
             {lockedCount} game{lockedCount === 1 ? "" : "s"} on the books
             {requestedCount > 0 ? ` · ${requestedCount} pending UIC` : ""}
+            {totalEarned > 0 ? ` · ${formatMoney(totalEarned)} earned` : ""}
           </p>
           <Link
             href="/profile"
