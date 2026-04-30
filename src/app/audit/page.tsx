@@ -197,8 +197,19 @@ export default async function AuditPage({
                 minute: "2-digit",
                 hour12: true,
               });
+              const gameDateLabel = r.game
+                ? new Date(r.game.starts_at).toLocaleString("en-US", {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                    hour12: true,
+                    timeZone: "UTC",
+                  })
+                : null;
               const gameLabel = r.game
-                ? `${r.game.division_code} ${r.game.team_home} vs ${r.game.team_away}`
+                ? `${r.game.division_code} · ${r.game.team_home} vs ${r.game.team_away}`
                 : null;
               return (
                 <li key={r.id} className="px-4 py-3">
@@ -228,8 +239,11 @@ export default async function AuditPage({
                     <span className="ml-auto text-xs text-zinc-400">{when}</span>
                   </div>
                   {gameLabel && (
-                    <div className="mt-1 truncate text-xs text-zinc-600">
-                      {gameLabel}
+                    <div className="mt-1 text-xs text-zinc-600">
+                      <span className="font-semibold text-zinc-700">
+                        {gameDateLabel}
+                      </span>{" "}
+                      · <span className="truncate">{gameLabel}</span>
                     </div>
                   )}
                 </li>
