@@ -253,13 +253,6 @@ export async function toggleTournament(formData: FormData): Promise<void> {
   const { error } = await sb.from("games").update(updates).eq("id", gameId);
   if (error) throw error;
 
-  await logAudit({
-    action: "tournament_toggle",
-    actorId: uic.id,
-    gameId,
-    details: { is_tournament: flipping },
-  });
-
   revalidatePath("/games");
   revalidatePath("/uic");
   revalidatePath("/dashboard");

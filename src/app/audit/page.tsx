@@ -11,10 +11,6 @@ const ACTION_LABELS: Record<string, { label: string; tone: string }> = {
   decline: { label: "Declined", tone: "bg-red-100 text-red-900" },
   pay: { label: "Paid", tone: "bg-emerald-100 text-emerald-900" },
   unpay: { label: "Unpaid", tone: "bg-orange-100 text-orange-900" },
-  tournament_toggle: {
-    label: "Tournament toggle",
-    tone: "bg-brand-100 text-brand-900",
-  },
   swap_propose: { label: "Swap proposed", tone: "bg-amber-100 text-amber-900" },
   swap_accept: { label: "Swap accepted", tone: "bg-lime-200 text-brand-900" },
   swap_decline: { label: "Swap declined", tone: "bg-red-100 text-red-900" },
@@ -24,7 +20,7 @@ const ACTION_LABELS: Record<string, { label: string; tone: string }> = {
 
 const FILTER_GROUPS: { label: string; actions: string[] }[] = [
   { label: "Requests", actions: ["request", "cancel"] },
-  { label: "UIC", actions: ["approve", "decline", "tournament_toggle"] },
+  { label: "UIC", actions: ["approve", "decline"] },
   { label: "Pay", actions: ["pay", "unpay"] },
   {
     label: "Swaps",
