@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { ensureCurrentUserRow } from "@/lib/users";
 import { supabaseServer } from "@/lib/supabase/server";
+import { cancelMyRequest } from "@/app/games/actions";
 import {
   formatGameDate,
   formatGameTime,
@@ -208,11 +209,22 @@ export default async function DashboardPage() {
                               {formatMoney(g.pay_per_slot)} pay
                             </div>
                           </div>
-                          <span
-                            className={`inline-flex h-7 items-center rounded-md px-2 text-xs font-semibold ${tone}`}
-                          >
-                            {label}
-                          </span>
+                          <div className="flex flex-col items-end gap-1">
+                            <span
+                              className={`inline-flex h-7 items-center rounded-md px-2 text-xs font-semibold ${tone}`}
+                            >
+                              {label}
+                            </span>
+                            <form action={cancelMyRequest}>
+                              <input type="hidden" name="assignmentId" value={r.id} />
+                              <button
+                                type="submit"
+                                className="text-xs text-zinc-500 underline-offset-2 hover:text-zinc-700 hover:underline"
+                              >
+                                Cancel
+                              </button>
+                            </form>
+                          </div>
                         </div>
                       </li>
                     );
