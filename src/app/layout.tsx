@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Geist } from "next/font/google";
-import { ClerkProvider, UserButton } from "@clerk/nextjs";
-import { auth } from "@clerk/nextjs/server";
-import { supabaseServer } from "@/lib/supabase/server";
+import { ClerkProvider } from "@clerk/nextjs";
+import HeaderNav from "@/components/HeaderNav";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -31,27 +30,11 @@ export const viewport = {
 
 export const dynamic = "force-dynamic";
 
-async function currentAuthState() {
-  const { userId } = await auth();
-  if (!userId) return { signedIn: false, role: null as string | null };
-  const sb = supabaseServer();
-  const { data } = await sb
-    .from("users")
-    .select("role")
-    .eq("clerk_user_id", userId)
-    .maybeSingle();
-  return { signedIn: true, role: (data?.role as string) ?? null };
-}
-
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { signedIn, role } = await currentAuthState();
-  const showPayouts = role === "board" || role === "admin";
-  const showApprovals = role === "uic" || role === "admin";
-
   return (
     <ClerkProvider>
       <html
@@ -77,46 +60,7 @@ export default async function RootLayout({
                 >
                   Schedule
                 </Link>
-                {signedIn ? (
-                  <>
-                    <Link
-                      href="/dashboard"
-                      className="font-medium text-white/85 hover:text-white"
-                    >
-                      My games
-                    </Link>
-                    {showApprovals && (
-                      <Link
-                        href="/uic"
-                        className="font-medium text-white/85 hover:text-white"
-                      >
-                        Approvals
-                      </Link>
-                    )}
-                    {showPayouts && (
-                      <Link
-                        href="/uic/payouts"
-                        className="font-medium text-white/85 hover:text-white"
-                      >
-                        Payouts
-                      </Link>
-                    )}
-                    <Link
-                      href="/profile"
-                      className="font-medium text-white/85 hover:text-white"
-                    >
-                      Profile
-                    </Link>
-                    <UserButton />
-                  </>
-                ) : (
-                  <Link
-                    href="/sign-in"
-                    className="inline-flex h-8 items-center justify-center rounded-md bg-lime-400 px-3 text-xs font-bold text-brand-900 hover:bg-lime-500"
-                  >
-                    Sign in
-                  </Link>
-                )}
+                <HeaderNav />
               </nav>
             </div>
           </header>
