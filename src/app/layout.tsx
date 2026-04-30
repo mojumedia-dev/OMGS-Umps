@@ -32,28 +32,28 @@ export default function RootLayout({
         className={`${geistSans.variable} h-full antialiased`}
       >
         <body className="min-h-full flex flex-col bg-zinc-50 text-zinc-900">
-          <header className="border-b border-zinc-200 bg-white">
+          <header className="bg-brand-700 text-white shadow-sm">
             <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between px-4 sm:px-6">
               <Link
                 href="/"
-                className="flex items-center gap-2 text-sm font-semibold tracking-tight"
+                className="flex items-center gap-2 text-sm font-bold tracking-tight"
               >
-                <span className="inline-flex h-6 w-6 items-center justify-center rounded bg-zinc-900 text-[10px] font-bold text-white">
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-lime-400 text-[10px] font-extrabold text-brand-900">
                   OMGS
                 </span>
-                Umps
+                <span className="text-white">Umps</span>
               </Link>
               <nav className="flex items-center gap-4 text-sm">
                 <Link
                   href="/games"
-                  className="text-zinc-600 hover:text-zinc-900"
+                  className="font-medium text-white/85 hover:text-white"
                 >
                   Schedule
                 </Link>
                 <Show when="signed-in">
                   <Link
                     href="/dashboard"
-                    className="text-zinc-600 hover:text-zinc-900"
+                    className="font-medium text-white/85 hover:text-white"
                   >
                     My games
                   </Link>
@@ -62,7 +62,7 @@ export default function RootLayout({
                 <Show when="signed-out">
                   <Link
                     href="/sign-in"
-                    className="inline-flex h-8 items-center justify-center rounded-md bg-zinc-900 px-3 text-xs font-semibold text-white hover:bg-zinc-800"
+                    className="inline-flex h-8 items-center justify-center rounded-md bg-lime-400 px-3 text-xs font-bold text-brand-900 hover:bg-lime-500"
                   >
                     Sign in
                   </Link>

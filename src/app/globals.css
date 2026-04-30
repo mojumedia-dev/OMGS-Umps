@@ -9,18 +9,29 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* OMGS brand */
+  --color-brand-50: #f5f0fa;
+  --color-brand-100: #e6d8f2;
+  --color-brand-200: #c8a8e0;
+  --color-brand-400: #8b3fb8;
+  --color-brand-500: #6b2a9a;
+  --color-brand-600: #5b2785;     /* primary purple from logo */
+  --color-brand-700: #4a1d6e;
+  --color-brand-800: #3a1657;
+  --color-brand-900: #2a0e3f;
+
+  /* Softball lime / yellow-green accent */
+  --color-lime-100: #f1f7c4;
+  --color-lime-200: #e3ee8a;
+  --color-lime-400: #d8e444;     /* main accent */
+  --color-lime-500: #c4d033;
+  --color-lime-600: #aab828;
+  --color-lime-700: #8a951c;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }

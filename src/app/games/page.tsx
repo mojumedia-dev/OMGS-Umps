@@ -116,7 +116,7 @@ export default async function GamesPage() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="inline-flex h-5 items-center rounded bg-zinc-900 px-1.5 text-[11px] font-bold text-white">
+                            <span className="inline-flex h-5 items-center rounded bg-brand-600 px-1.5 text-[11px] font-bold text-white">
                               {g.division_code}
                             </span>
                             <span className="text-sm text-zinc-500">
@@ -188,7 +188,7 @@ function GameAction({
     const tone =
       mine.status === "requested"
         ? "bg-amber-100 text-amber-900"
-        : "bg-emerald-100 text-emerald-900";
+        : "bg-lime-200 text-brand-900";
     return (
       <form action={cancelMyRequest} className="flex flex-col items-end gap-1">
         <span className={`inline-flex h-7 items-center rounded-md px-2 text-xs font-semibold ${tone}`}>
@@ -218,7 +218,7 @@ function GameAction({
       <input type="hidden" name="gameId" value={game.id} />
       <button
         type="submit"
-        className="inline-flex h-9 items-center justify-center rounded-md bg-zinc-900 px-3 text-xs font-semibold text-white transition-colors hover:bg-zinc-800"
+        className="inline-flex h-9 items-center justify-center rounded-md bg-brand-600 px-3 text-xs font-bold text-white transition-colors hover:bg-brand-700"
       >
         Request
       </button>

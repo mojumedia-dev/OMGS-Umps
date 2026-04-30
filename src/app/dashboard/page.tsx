@@ -79,14 +79,14 @@ export default async function DashboardPage() {
         <div className="mb-6 flex flex-wrap gap-2">
           <Link
             href="/games"
-            className="inline-flex h-10 items-center justify-center rounded-md bg-zinc-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-zinc-800"
+            className="inline-flex h-10 items-center justify-center rounded-md bg-brand-600 px-4 text-sm font-bold text-white transition-colors hover:bg-brand-700"
           >
             Browse open games
           </Link>
           {(user.role === "uic" || user.role === "admin") && (
             <Link
               href="/uic"
-              className="inline-flex h-10 items-center justify-center rounded-md border border-zinc-300 bg-white px-4 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-100"
+              className="inline-flex h-10 items-center justify-center rounded-md bg-lime-400 px-4 text-sm font-bold text-brand-900 transition-colors hover:bg-lime-500"
             >
               UIC approvals
             </Link>
@@ -119,7 +119,7 @@ export default async function DashboardPage() {
                     const tone =
                       r.status === "requested"
                         ? "bg-amber-100 text-amber-900"
-                        : "bg-emerald-100 text-emerald-900";
+                        : "bg-lime-200 text-brand-900";
                     const label =
                       r.status === "requested"
                         ? "Pending UIC"
@@ -131,7 +131,7 @@ export default async function DashboardPage() {
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <span className="inline-flex h-5 items-center rounded bg-zinc-900 px-1.5 text-[11px] font-bold text-white">
+                              <span className="inline-flex h-5 items-center rounded bg-brand-600 px-1.5 text-[11px] font-bold text-white">
                                 {g.division_code}
                               </span>
                               <span className="text-sm text-zinc-500">
