@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { ensureCurrentUserRow } from "@/lib/users";
 import { supabaseServer } from "@/lib/supabase/server";
 import { refreshGameStatus } from "@/lib/db/game-status";
+import { logAudit } from "@/lib/audit/log";
 
 export async function requestGame(formData: FormData): Promise<void> {
   const gameId = String(formData.get("gameId") ?? "");
@@ -28,12 +29,26 @@ export async function requestGame(formData: FormData): Promise<void> {
     );
   }
 
-  const { error } = await sb.from("assignments").insert({
-    game_id: gameId,
-    umpire_id: user.id,
-    status: "requested",
-  });
+  const { data: created, error } = await sb
+    .from("assignments")
+    .insert({
+      game_id: gameId,
+      umpire_id: user.id,
+      status: "requested",
+    })
+    .select("id")
+    .maybeSingle();
   if (error && error.code !== "23505") throw error; // ignore duplicate request
+
+  if (created?.id) {
+    await logAudit({
+      action: "request",
+      actorId: user.id,
+      subjectId: user.id,
+      gameId,
+      assignmentId: created.id,
+    });
+  }
 
   revalidatePath("/games");
   revalidatePath("/dashboard");
@@ -57,6 +72,16 @@ export async function cancelMyRequest(formData: FormData): Promise<void> {
     .maybeSingle();
   if (error) throw error;
   if (a?.game_id) await refreshGameStatus(a.game_id);
+
+  if (a) {
+    await logAudit({
+      action: "cancel",
+      actorId: user.id,
+      subjectId: user.id,
+      gameId: a.game_id,
+      assignmentId,
+    });
+  }
 
   revalidatePath("/games");
   revalidatePath("/dashboard");

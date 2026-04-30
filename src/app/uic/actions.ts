@@ -5,6 +5,7 @@ import { ensureCurrentUserRow } from "@/lib/users";
 import { supabaseServer } from "@/lib/supabase/server";
 import { refreshGameStatus } from "@/lib/db/game-status";
 import { sendPushToUser } from "@/lib/push/send";
+import { logAudit } from "@/lib/audit/log";
 
 function formatGameSummary(g: {
   division_code: string;
@@ -70,6 +71,13 @@ export async function approveRequest(formData: FormData): Promise<void> {
       url: "/dashboard",
       tag: `approved-${a.game_id}`,
     });
+    await logAudit({
+      action: "approve",
+      actorId: uic.id,
+      subjectId: a.umpire_id,
+      gameId: a.game_id,
+      assignmentId,
+    });
   }
 
   revalidatePath("/uic");
@@ -80,7 +88,7 @@ export async function approveRequest(formData: FormData): Promise<void> {
 export async function declineRequest(formData: FormData): Promise<void> {
   const assignmentId = String(formData.get("assignmentId") ?? "");
   if (!assignmentId) throw new Error("Missing assignmentId");
-  await requireUic();
+  const uic = await requireUic();
 
   const sb = supabaseServer();
   const { data: a, error } = await sb
@@ -108,6 +116,13 @@ export async function declineRequest(formData: FormData): Promise<void> {
       body: formatGameSummary(g),
       url: "/games",
       tag: `declined-${a.game_id}`,
+    });
+    await logAudit({
+      action: "decline",
+      actorId: uic.id,
+      subjectId: a.umpire_id,
+      gameId: a.game_id,
+      assignmentId,
     });
   }
 
@@ -154,6 +169,14 @@ export async function markPaid(formData: FormData): Promise<void> {
       url: "/dashboard",
       tag: `paid-${a.game_id}`,
     });
+    await logAudit({
+      action: "pay",
+      actorId: board.id,
+      subjectId: a.umpire_id,
+      gameId: a.game_id,
+      assignmentId,
+      details: { amount },
+    });
   }
 
   revalidatePath("/uic");
@@ -164,10 +187,10 @@ export async function markPaid(formData: FormData): Promise<void> {
 export async function undoPaid(formData: FormData): Promise<void> {
   const assignmentId = String(formData.get("assignmentId") ?? "");
   if (!assignmentId) throw new Error("Missing assignmentId");
-  await requireBoard();
+  const board = await requireBoard();
 
   const sb = supabaseServer();
-  const { error } = await sb
+  const { data: a, error } = await sb
     .from("assignments")
     .update({
       status: "approved",
@@ -176,8 +199,20 @@ export async function undoPaid(formData: FormData): Promise<void> {
       paid_by: null,
     })
     .eq("id", assignmentId)
-    .eq("status", "paid");
+    .eq("status", "paid")
+    .select("game_id, umpire_id")
+    .maybeSingle();
   if (error) throw error;
+
+  if (a) {
+    await logAudit({
+      action: "unpay",
+      actorId: board.id,
+      subjectId: a.umpire_id,
+      gameId: a.game_id,
+      assignmentId,
+    });
+  }
 
   revalidatePath("/uic");
   revalidatePath("/uic/payouts");
@@ -187,7 +222,7 @@ export async function undoPaid(formData: FormData): Promise<void> {
 export async function toggleTournament(formData: FormData): Promise<void> {
   const gameId = String(formData.get("gameId") ?? "");
   if (!gameId) throw new Error("Missing gameId");
-  await requireUic();
+  const uic = await requireUic();
 
   const sb = supabaseServer();
   const [{ data: g }, { data: divs }] = await Promise.all([
@@ -217,6 +252,13 @@ export async function toggleTournament(formData: FormData): Promise<void> {
 
   const { error } = await sb.from("games").update(updates).eq("id", gameId);
   if (error) throw error;
+
+  await logAudit({
+    action: "tournament_toggle",
+    actorId: uic.id,
+    gameId,
+    details: { is_tournament: flipping },
+  });
 
   revalidatePath("/games");
   revalidatePath("/uic");
