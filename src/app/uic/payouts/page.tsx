@@ -25,7 +25,9 @@ type Row = {
 export default async function PayoutsPage() {
   const user = await ensureCurrentUserRow();
   if (!user) redirect("/sign-in");
-  if (user.role !== "uic" && user.role !== "admin") redirect("/dashboard");
+  if (user.role !== "uic" && user.role !== "admin" && user.role !== "board")
+    redirect("/dashboard");
+  const canEdit = user.role === "uic" || user.role === "admin";
 
   const sb = supabaseServer();
   const nowIso = new Date().toISOString();
@@ -144,30 +146,39 @@ export default async function PayoutsPage() {
                           </div>
                           <div className="shrink-0">
                             {isPaid ? (
-                              <form
-                                action={undoPaid}
-                                className="flex items-center gap-2 text-right"
-                              >
-                                <div>
+                              canEdit ? (
+                                <form
+                                  action={undoPaid}
+                                  className="flex items-center gap-2 text-right"
+                                >
+                                  <div>
+                                    <div className="text-xs text-zinc-500">Paid</div>
+                                    <div className="text-sm font-bold text-emerald-700">
+                                      {formatMoney(r.paid_amount ?? 0)}
+                                    </div>
+                                  </div>
+                                  <input
+                                    type="hidden"
+                                    name="assignmentId"
+                                    value={r.id}
+                                  />
+                                  <button
+                                    type="submit"
+                                    className="text-xs text-zinc-500 underline-offset-2 hover:underline"
+                                    title="Undo payment"
+                                  >
+                                    Undo
+                                  </button>
+                                </form>
+                              ) : (
+                                <div className="text-right">
                                   <div className="text-xs text-zinc-500">Paid</div>
                                   <div className="text-sm font-bold text-emerald-700">
                                     {formatMoney(r.paid_amount ?? 0)}
                                   </div>
                                 </div>
-                                <input
-                                  type="hidden"
-                                  name="assignmentId"
-                                  value={r.id}
-                                />
-                                <button
-                                  type="submit"
-                                  className="text-xs text-zinc-500 underline-offset-2 hover:underline"
-                                  title="Undo payment"
-                                >
-                                  Undo
-                                </button>
-                              </form>
-                            ) : (
+                              )
+                            ) : canEdit ? (
                               <form
                                 action={markPaid}
                                 className="flex items-center gap-2"
@@ -192,6 +203,13 @@ export default async function PayoutsPage() {
                                   Pay
                                 </button>
                               </form>
+                            ) : (
+                              <div className="text-right">
+                                <div className="text-xs text-zinc-500">Owed</div>
+                                <div className="text-sm font-semibold text-zinc-900">
+                                  {formatMoney(g.pay_per_slot)}
+                                </div>
+                              </div>
                             )}
                           </div>
                         </div>

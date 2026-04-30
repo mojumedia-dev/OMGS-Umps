@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Geist } from "next/font/google";
 import { ClerkProvider, Show, UserButton } from "@clerk/nextjs";
+import { auth } from "@clerk/nextjs/server";
+import { supabaseServer } from "@/lib/supabase/server";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -27,11 +29,27 @@ export const viewport = {
   themeColor: "#4a1d6e",
 };
 
-export default function RootLayout({
+async function currentUserRole(): Promise<string | null> {
+  const { userId } = await auth();
+  if (!userId) return null;
+  const sb = supabaseServer();
+  const { data } = await sb
+    .from("users")
+    .select("role")
+    .eq("clerk_user_id", userId)
+    .maybeSingle();
+  return (data?.role as string) ?? null;
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const role = await currentUserRole();
+  const showPayouts = role === "uic" || role === "admin" || role === "board";
+  const showApprovals = role === "uic" || role === "admin";
+
   return (
     <ClerkProvider>
       <html
@@ -50,7 +68,7 @@ export default function RootLayout({
                 </span>
                 <span className="text-white">Umps</span>
               </Link>
-              <nav className="flex items-center gap-4 text-sm">
+              <nav className="flex items-center gap-3 text-sm sm:gap-4">
                 <Link
                   href="/games"
                   className="font-medium text-white/85 hover:text-white"
@@ -64,6 +82,22 @@ export default function RootLayout({
                   >
                     My games
                   </Link>
+                  {showApprovals && (
+                    <Link
+                      href="/uic"
+                      className="font-medium text-white/85 hover:text-white"
+                    >
+                      Approvals
+                    </Link>
+                  )}
+                  {showPayouts && (
+                    <Link
+                      href="/uic/payouts"
+                      className="font-medium text-white/85 hover:text-white"
+                    >
+                      Payouts
+                    </Link>
+                  )}
                   <Link
                     href="/profile"
                     className="font-medium text-white/85 hover:text-white"

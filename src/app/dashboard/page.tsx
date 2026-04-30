@@ -48,14 +48,39 @@ export default async function DashboardPage() {
       : Promise.resolve({ count: 0 } as { count: number | null }),
     sb
       .from("assignments")
-      .select("paid_amount")
+      .select("paid_amount, paid_at, game:games(starts_at, division_code)")
       .eq("umpire_id", user.id)
       .eq("status", "paid"),
   ]);
-  const totalEarned = (paidRes.data ?? []).reduce(
-    (s: number, r: { paid_amount: number | null }) => s + (r.paid_amount ?? 0),
-    0
-  );
+  type PaidRow = {
+    paid_amount: number | null;
+    paid_at: string | null;
+    game: { starts_at: string; division_code: string } | null;
+  };
+  const paidRows = (paidRes.data ?? []) as unknown as PaidRow[];
+  const totalEarned = paidRows.reduce((s, r) => s + (r.paid_amount ?? 0), 0);
+
+  // Group earnings by ISO Mon-Sun week (using the game date, not paid_at)
+  function weekKey(iso: string): string {
+    const d = new Date(iso);
+    const dow = d.getUTCDay() || 7; // Mon=1..Sun=7
+    d.setUTCDate(d.getUTCDate() - (dow - 1));
+    return d.toISOString().slice(0, 10);
+  }
+  const weekly = new Map<string, { count: number; total: number }>();
+  for (const r of paidRows) {
+    if (!r.game) continue;
+    const k = weekKey(r.game.starts_at);
+    const cur = weekly.get(k) ?? { count: 0, total: 0 };
+    cur.count++;
+    cur.total += r.paid_amount ?? 0;
+    weekly.set(k, cur);
+  }
+  const weeklyEarnings = [...weekly.entries()]
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .slice(0, 8); // most recent 8 weeks
+  const thisWeekKey = weekKey(nowIso);
+  const thisWeekEarned = weekly.get(thisWeekKey)?.total ?? 0;
 
   const openGamesCount = openGamesRes.count ?? 0;
   const pendingApprovalsCount = pendingApprovalsRes.count ?? 0;
@@ -100,7 +125,7 @@ export default async function DashboardPage() {
           <p className="mt-1 text-sm text-zinc-600">
             {lockedCount} game{lockedCount === 1 ? "" : "s"} on the books
             {requestedCount > 0 ? ` · ${requestedCount} pending UIC` : ""}
-            {totalEarned > 0 ? ` · ${formatMoney(totalEarned)} earned` : ""}
+            {thisWeekEarned > 0 ? ` · ${formatMoney(thisWeekEarned)} this week` : ""}
           </p>
           <Link
             href="/profile"
@@ -163,6 +188,57 @@ export default async function DashboardPage() {
             </span>
           </Link>
         </div>
+
+        {weeklyEarnings.length > 0 && (
+          <section className="mb-6 rounded-lg border border-zinc-200 bg-white p-5">
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-base font-bold text-brand-800">Earnings</h2>
+              <div className="text-sm">
+                <span className="font-bold text-emerald-700">
+                  {formatMoney(totalEarned)}
+                </span>
+                <span className="ml-1 text-xs text-zinc-500">total</span>
+              </div>
+            </div>
+            <ul className="mt-3 divide-y divide-zinc-200">
+              {weeklyEarnings.map(([key, w]) => {
+                const start = new Date(key + "T00:00:00Z");
+                const end = new Date(start);
+                end.setUTCDate(end.getUTCDate() + 6);
+                const fmt = (d: Date) =>
+                  d.toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    timeZone: "UTC",
+                  });
+                const isCurrent = key === thisWeekKey;
+                return (
+                  <li
+                    key={key}
+                    className="flex items-center justify-between py-2 text-sm"
+                  >
+                    <div>
+                      <div className="font-medium text-zinc-900">
+                        Week of {fmt(start)} – {fmt(end)}
+                        {isCurrent && (
+                          <span className="ml-2 inline-flex h-5 items-center rounded-full bg-lime-200 px-2 text-[10px] font-bold uppercase text-brand-900">
+                            this week
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-zinc-500">
+                        {w.count} game{w.count === 1 ? "" : "s"}
+                      </div>
+                    </div>
+                    <div className="text-sm font-bold text-emerald-700">
+                      {formatMoney(w.total)}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
 
         {upcoming.length === 0 ? (
           <div className="rounded-lg border border-dashed border-zinc-300 bg-white p-8 text-center">
