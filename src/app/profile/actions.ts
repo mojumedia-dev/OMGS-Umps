@@ -36,6 +36,44 @@ function normalizeUsPhone(raw: string): string | null {
   return `+1${ten}`;
 }
 
+export async function updateAvatar(formData: FormData): Promise<void> {
+  const user = await ensureCurrentUserRow();
+  if (!user) throw new Error("Not signed in");
+
+  const file = formData.get("avatar");
+  if (!(file instanceof File) || file.size === 0) return;
+  if (file.size > 5 * 1024 * 1024) throw new Error("Photo must be ≤ 5MB");
+  if (!file.type.startsWith("image/"))
+    throw new Error("Photo must be an image (jpeg, png, webp, gif)");
+
+  const ext = (file.name.split(".").pop() ?? "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const path = `${user.id}/${Date.now()}.${ext || "jpg"}`;
+
+  const sb = supabaseServer();
+  const arrayBuffer = await file.arrayBuffer();
+
+  const { error: uploadErr } = await sb.storage
+    .from("avatars")
+    .upload(path, arrayBuffer, {
+      contentType: file.type,
+      upsert: true,
+    });
+  if (uploadErr) throw uploadErr;
+
+  const { data: pub } = sb.storage.from("avatars").getPublicUrl(path);
+
+  const { error: updateErr } = await sb
+    .from("users")
+    .update({ avatar_url: pub.publicUrl })
+    .eq("id", user.id);
+  if (updateErr) throw updateErr;
+
+  revalidatePath("/profile");
+  revalidatePath("/games");
+  revalidatePath("/uic");
+  revalidatePath("/dashboard");
+}
+
 export async function updateContact(formData: FormData): Promise<void> {
   const user = await ensureCurrentUserRow();
   if (!user) throw new Error("Not signed in");

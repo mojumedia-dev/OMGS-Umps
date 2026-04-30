@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ensureCurrentUserRow } from "@/lib/users";
-import { updateEligibility, updateContact } from "./actions";
+import { updateEligibility, updateContact, updateAvatar } from "./actions";
 import type { DivisionCode } from "@/lib/db/types";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +28,47 @@ export default async function ProfilePage() {
             ← Dashboard
           </Link>
         </div>
+
+        <form
+          action={updateAvatar}
+          encType="multipart/form-data"
+          className="mb-6 rounded-lg border border-zinc-200 bg-white p-5"
+        >
+          <h2 className="text-base font-bold text-brand-800">Photo</h2>
+          <p className="mt-1 text-sm text-zinc-600">
+            Helps everyone recognize who&apos;s assigned to a game.
+          </p>
+          <div className="mt-4 flex items-center gap-4">
+            {user.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={user.avatar_url}
+                alt="Your photo"
+                className="h-16 w-16 rounded-full object-cover ring-2 ring-brand-200"
+              />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-100 text-lg font-bold text-brand-700">
+                {(user.full_name || "U").trim().charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="flex-1">
+              <input
+                type="file"
+                name="avatar"
+                accept="image/*"
+                required
+                className="block w-full text-sm text-zinc-700 file:mr-3 file:rounded-md file:border-0 file:bg-brand-600 file:px-3 file:py-2 file:text-xs file:font-bold file:text-white file:hover:bg-brand-700"
+              />
+              <p className="mt-1 text-xs text-zinc-500">JPG/PNG, ≤ 5MB</p>
+            </div>
+          </div>
+          <button
+            type="submit"
+            className="mt-4 inline-flex h-10 items-center justify-center rounded-md bg-brand-600 px-4 text-sm font-bold text-white transition-colors hover:bg-brand-700"
+          >
+            Upload photo
+          </button>
+        </form>
 
         <form
           action={updateContact}
