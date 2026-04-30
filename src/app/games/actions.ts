@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { ensureCurrentUserRow } from "@/lib/users";
 import { supabaseServer } from "@/lib/supabase/server";
+import { refreshGameStatus } from "@/lib/db/game-status";
 
 export async function requestGame(formData: FormData): Promise<void> {
   const gameId = String(formData.get("gameId") ?? "");
@@ -46,14 +47,18 @@ export async function cancelMyRequest(formData: FormData): Promise<void> {
   if (!user) throw new Error("Not signed in");
 
   const sb = supabaseServer();
-  const { error } = await sb
+  const { data: a, error } = await sb
     .from("assignments")
     .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
     .eq("id", assignmentId)
     .eq("umpire_id", user.id)
-    .in("status", ["requested", "approved", "confirmed"]);
+    .in("status", ["requested", "approved", "confirmed"])
+    .select("game_id")
+    .maybeSingle();
   if (error) throw error;
+  if (a?.game_id) await refreshGameStatus(a.game_id);
 
   revalidatePath("/games");
   revalidatePath("/dashboard");
+  revalidatePath("/uic");
 }
