@@ -9,6 +9,7 @@ import {
   formatGameTime,
   formatGameDateKey,
   formatMoney,
+  nowAsLeagueIso,
 } from "@/lib/format";
 import type { Game, Assignment } from "@/lib/db/types";
 import { requestGame, cancelMyRequest } from "./actions";
@@ -36,7 +37,7 @@ export default async function GamesPage({
   const focus = params.focus ?? null;
 
   const sb = supabaseServer();
-  const nowIso = new Date().toISOString();
+  const nowIso = nowAsLeagueIso();
 
   const [{ data: gamesData, error: gamesErr }, { data: allActive, error: assnErr }] = await Promise.all([
     sb

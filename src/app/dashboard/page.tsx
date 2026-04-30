@@ -11,6 +11,7 @@ import {
   formatGameTime,
   formatGameDateKey,
   formatMoney,
+  nowAsLeagueIso,
 } from "@/lib/format";
 import type { Game, Assignment } from "@/lib/db/types";
 
@@ -23,7 +24,7 @@ export default async function DashboardPage() {
   if (!user) redirect("/sign-in");
 
   const sb = supabaseServer();
-  const nowIso = new Date().toISOString();
+  const nowIso = nowAsLeagueIso();
   const isUic = user.role === "uic" || user.role === "admin";
 
   const [

@@ -7,6 +7,7 @@ import {
   formatGameTime,
   formatGameDateKey,
   formatMoney,
+  nowAsLeagueIso,
 } from "@/lib/format";
 import type { Game, User } from "@/lib/db/types";
 import { markPaid, undoPaid } from "../actions";
@@ -30,7 +31,7 @@ export default async function PayoutsPage() {
   const canEdit = user.role === "board" || user.role === "admin";
 
   const sb = supabaseServer();
-  const nowIso = new Date().toISOString();
+  const nowIso = nowAsLeagueIso();
 
   // Eligible: games that have started and have assignments in approved/confirmed/completed/paid
   const { data: rows, error } = await sb
