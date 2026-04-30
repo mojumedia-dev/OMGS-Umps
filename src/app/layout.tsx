@@ -57,6 +57,12 @@ export default function RootLayout({
                   >
                     My games
                   </Link>
+                  <Link
+                    href="/profile"
+                    className="font-medium text-white/85 hover:text-white"
+                  >
+                    Profile
+                  </Link>
                   <UserButton />
                 </Show>
                 <Show when="signed-out">
