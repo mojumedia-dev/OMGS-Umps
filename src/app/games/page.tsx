@@ -37,7 +37,9 @@ export default async function GamesPage() {
       .limit(500),
     sb
       .from("assignments")
-      .select("id, game_id, umpire_id, status")
+      .select(
+        "id, game_id, umpire_id, status, umpire:users!assignments_umpire_id_fkey(full_name)"
+      )
       .in("status", ACTIVE_STATUSES),
   ]);
 
@@ -52,15 +54,16 @@ export default async function GamesPage() {
   }
 
   const games = (gamesData ?? []) as Game[];
-  const assignments = (allActive ?? []) as Pick<
-    Assignment,
-    "id" | "game_id" | "umpire_id" | "status"
-  >[];
+  type AssignmentRow = Pick<Assignment, "id" | "game_id" | "umpire_id" | "status"> & {
+    umpire: { full_name: string } | null;
+  };
+  const assignments = (allActive ?? []) as unknown as AssignmentRow[];
 
-  const filledCountByGame = new Map<string, number>();
-  const myAssignmentByGame = new Map<string, (typeof assignments)[number]>();
+  const assignmentsByGame = new Map<string, AssignmentRow[]>();
+  const myAssignmentByGame = new Map<string, AssignmentRow>();
   for (const a of assignments) {
-    filledCountByGame.set(a.game_id, (filledCountByGame.get(a.game_id) ?? 0) + 1);
+    if (!assignmentsByGame.has(a.game_id)) assignmentsByGame.set(a.game_id, []);
+    assignmentsByGame.get(a.game_id)!.push(a);
     if (user && a.umpire_id === user.id) myAssignmentByGame.set(a.game_id, a);
   }
 
@@ -108,7 +111,8 @@ export default async function GamesPage() {
               </h2>
               <ul className="mt-3 divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white">
                 {dayGames.map((g) => {
-                  const filled = filledCountByGame.get(g.id) ?? 0;
+                  const gameAssignments = assignmentsByGame.get(g.id) ?? [];
+                  const filled = gameAssignments.length;
                   const remaining = g.ump_slots - filled;
                   const mine = myAssignmentByGame.get(g.id);
                   return (
@@ -129,8 +133,21 @@ export default async function GamesPage() {
                           <div className="truncate text-sm text-zinc-700">
                             vs {g.team_away}
                           </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            {gameAssignments.map((a) => (
+                              <UmpPill key={a.id} a={a} />
+                            ))}
+                            {Array.from({ length: Math.max(0, remaining) }).map((_, i) => (
+                              <span
+                                key={`open-${i}`}
+                                className="inline-flex h-6 items-center rounded-full border border-dashed border-zinc-300 px-2 text-[11px] font-medium text-zinc-500"
+                              >
+                                Open
+                              </span>
+                            ))}
+                          </div>
                           <div className="mt-1.5 text-xs text-zinc-500">
-                            {filled}/{g.ump_slots} filled · {formatMoney(g.pay_per_slot)}/ump
+                            {formatMoney(g.pay_per_slot)}/ump
                           </div>
                         </div>
                         <div className="shrink-0">
@@ -151,6 +168,33 @@ export default async function GamesPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+function UmpPill({
+  a,
+}: {
+  a: { status: Assignment["status"]; umpire: { full_name: string } | null };
+}) {
+  const name = a.umpire?.full_name ?? "Umpire";
+  const display =
+    name.split(" ").length > 1
+      ? `${name.split(" ")[0]} ${name.split(" ").slice(-1)[0][0]}.`
+      : name;
+  const tone =
+    a.status === "requested"
+      ? "border-amber-300 bg-amber-50 text-amber-900"
+      : "border-brand-200 bg-lime-100 text-brand-900";
+  const dot =
+    a.status === "requested" ? "bg-amber-400" : "bg-lime-500";
+  return (
+    <span
+      className={`inline-flex h-6 items-center gap-1 rounded-full border px-2 text-[11px] font-semibold ${tone}`}
+      title={`${name} · ${a.status}`}
+    >
+      <span className={`inline-block h-1.5 w-1.5 rounded-full ${dot}`} />
+      {display}
+    </span>
   );
 }
 
