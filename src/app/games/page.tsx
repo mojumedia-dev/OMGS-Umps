@@ -51,6 +51,16 @@ export default async function GamesPage({
   const sb = supabaseServer();
   const nowIso = nowAsLeagueIso();
 
+  // Pull divisions so we know which are assignment-only (e.g. 8U)
+  const { data: divisionsData } = await sb
+    .from("divisions")
+    .select("code, assignment_only");
+  const assignmentOnlyCodes = new Set(
+    (divisionsData ?? [])
+      .filter((d) => d.assignment_only)
+      .map((d) => d.code as string)
+  );
+
   let gamesQuery = sb
     .from("games")
     .select("*")
@@ -324,6 +334,7 @@ export default async function GamesPage({
                             weekendSiblings={siblings}
                             myAssignmentByGame={myAssignmentByGame}
                             assignmentsByGame={assignmentsByGame}
+                            assignmentOnly={assignmentOnlyCodes.has(g.division_code)}
                           />
                         </div>
                       </div>
@@ -563,6 +574,7 @@ function GameAction({
   weekendSiblings,
   myAssignmentByGame,
   assignmentsByGame,
+  assignmentOnly,
 }: {
   user: { id: string; eligible_divisions?: string[] } | null;
   game: Game;
@@ -572,6 +584,7 @@ function GameAction({
   weekendSiblings: Game[];
   myAssignmentByGame: Map<string, AssignmentRowLite>;
   assignmentsByGame: Map<string, AssignmentRowLite[]>;
+  assignmentOnly: boolean;
 }) {
   if (!user) {
     return (
@@ -585,6 +598,17 @@ function GameAction({
   }
 
   const eligible = user.eligible_divisions?.includes(game.division_code) ?? true;
+
+  if (assignmentOnly && !mine) {
+    return (
+      <span
+        className="inline-flex h-9 items-center justify-center rounded-md bg-zinc-100 px-3 text-xs font-medium text-zinc-600"
+        title="Board assigns these games"
+      >
+        Board assigns
+      </span>
+    );
+  }
 
   if (mine) {
     const label =
