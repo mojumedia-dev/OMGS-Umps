@@ -261,6 +261,7 @@ export async function undoPaid(formData: FormData): Promise<void> {
 export async function transferAssignment(formData: FormData): Promise<void> {
   const assignmentId = String(formData.get("assignmentId") ?? "");
   const newUmpId = String(formData.get("umpireId") ?? "");
+  const scope = String(formData.get("scope") ?? "bundle"); // "single" | "bundle"
   if (!assignmentId || !newUmpId) throw new Error("Pick a target umpire");
 
   const uic = await requireUic();
@@ -286,8 +287,12 @@ export async function transferAssignment(formData: FormData): Promise<void> {
     team_away: string;
     field: string;
   };
-  const slot = await loadSlotGames(g);
-  const slotIds = slot.map((sg) => sg.id);
+  const fullSlot = await loadSlotGames(g);
+  // For "single", limit cascade to just this game; for "bundle", whole slot
+  const targetGameIds =
+    scope === "single" ? [g.id] : fullSlot.map((sg) => sg.id);
+  const targetGames =
+    scope === "single" ? [g] : fullSlot;
 
   // Conflict check on the receiving ump
   const { data: theirActive } = await sb
@@ -296,7 +301,7 @@ export async function transferAssignment(formData: FormData): Promise<void> {
     .eq("umpire_id", newUmpId)
     .in("status", ["requested", "assigned", "approved", "confirmed"]);
   type ActiveRow = { game: { starts_at: string; ends_at: string } | null };
-  for (const sg of slot) {
+  for (const sg of targetGames) {
     for (const a of (theirActive ?? []) as unknown as ActiveRow[]) {
       if (!a.game) continue;
       if (sg.starts_at < a.game.ends_at && sg.ends_at > a.game.starts_at) {
@@ -311,7 +316,7 @@ export async function transferAssignment(formData: FormData): Promise<void> {
     .update({ umpire_id: newUmpId })
     .eq("umpire_id", oldUmpId)
     .in("status", ["requested", "assigned", "approved", "confirmed"])
-    .in("game_id", slotIds);
+    .in("game_id", targetGameIds);
   if (error) throw error;
 
   await sendPushToUser(newUmpId, {
@@ -337,7 +342,8 @@ export async function transferAssignment(formData: FormData): Promise<void> {
       transfer: true,
       from_ump: oldUmpId,
       to_ump: newUmpId,
-      bundle_size: slot.length,
+      bundle_size: targetGames.length,
+      scope,
     },
   });
 

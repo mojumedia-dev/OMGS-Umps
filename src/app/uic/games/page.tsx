@@ -312,7 +312,7 @@ export default async function ManageGamesPage({
                               </span>
                               <form
                                 action={transferAssignment}
-                                className="ml-auto flex items-center gap-1"
+                                className="ml-auto flex flex-wrap items-center gap-1"
                               >
                                 <input
                                   type="hidden"
@@ -323,7 +323,7 @@ export default async function ManageGamesPage({
                                   name="umpireId"
                                   defaultValue=""
                                   required
-                                  className="h-7 max-w-44 rounded-md border border-zinc-300 bg-white px-1.5 text-xs"
+                                  className="h-7 max-w-40 rounded-md border border-zinc-300 bg-white px-1.5 text-xs"
                                 >
                                   <option value="" disabled>
                                     Transfer to…
@@ -335,6 +335,15 @@ export default async function ManageGamesPage({
                                         {u.full_name}
                                       </option>
                                     ))}
+                                </select>
+                                <select
+                                  name="scope"
+                                  defaultValue="single"
+                                  className="h-7 rounded-md border border-zinc-300 bg-white px-1.5 text-xs"
+                                  title="Move just this game or the whole same-field/day/division bundle"
+                                >
+                                  <option value="single">This game</option>
+                                  <option value="bundle">Whole bundle</option>
                                 </select>
                                 <button
                                   type="submit"
