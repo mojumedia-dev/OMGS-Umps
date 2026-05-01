@@ -76,19 +76,36 @@ export default async function GamesPage({
     .order("starts_at", { ascending: true })
     .limit(500);
   const effectiveScope = adminScope ?? user?.scope_divisions ?? null;
-  // Combine scope (hard filter) with the optional divisions chip filter
+  // Layer the filters: scope (role-based, hard) ⋂ eligible (profile, hard for umps) ⋂ chips (UI)
+  // Admins previewing a scope skip the eligible filter so they see everything in scope.
+  const eligibleFilter =
+    user && user.role === "umpire" && user.eligible_divisions?.length
+      ? user.eligible_divisions
+      : null;
   let activeDivisions: string[] | null = null;
-  if (effectiveScope?.length && divisionFilter?.length) {
-    activeDivisions = effectiveScope.filter((d) => divisionFilter.includes(d));
+  const layers = [effectiveScope, eligibleFilter, divisionFilter].filter(
+    (l): l is string[] => !!l && l.length > 0
+  );
+  if (layers.length === 0) {
+    activeDivisions = null;
   } else {
-    activeDivisions = divisionFilter ?? effectiveScope ?? null;
+    activeDivisions = layers.reduce((acc: string[] | null, l) => {
+      if (!acc) return l;
+      return acc.filter((d) => l.includes(d));
+    }, null);
   }
   if (activeDivisions && activeDivisions.length) {
     gamesQuery = gamesQuery.in("division_code", activeDivisions);
   }
-  // Set of divisions the user is allowed to see (for chip rendering)
-  const allowedDivisions =
-    effectiveScope ?? ["8U", "10U", "12U", "14U", "16U", "18U"];
+  // Allowed divisions for chip rendering = scope ⋂ eligible (or just scope/eligible/all)
+  const allowedDivisions = (() => {
+    const all: string[] = ["8U", "10U", "12U", "14U", "16U", "18U"];
+    let result = all;
+    if (effectiveScope) result = result.filter((d) => effectiveScope.includes(d));
+    if (eligibleFilter)
+      result = result.filter((d) => eligibleFilter.includes(d));
+    return result;
+  })();
   const [{ data: gamesData, error: gamesErr }, { data: allActive, error: assnErr }] = await Promise.all([
     gamesQuery,
     sb
