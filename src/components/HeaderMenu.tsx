@@ -53,7 +53,7 @@ export default function HeaderMenu({
             )}
             {showRoster && (
               <Link href="/uic/games" className={desktopLink}>
-                Roster
+                Assignments
               </Link>
             )}
             {showAssign && (
@@ -121,7 +121,7 @@ export default function HeaderMenu({
                   className={linkCls}
                   onClick={() => setOpen(false)}
                 >
-                  Roster
+                  Assignments
                 </Link>
               )}
               {showAssign && (
