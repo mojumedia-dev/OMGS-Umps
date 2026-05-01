@@ -61,17 +61,21 @@ export default async function AuditPage({
   const to = params.to ?? "";
 
   const sb = supabaseServer();
+  const scoped = user.scope_divisions && user.scope_divisions.length > 0;
   let query = sb
     .from("audit_log")
     .select(
       `id, action, created_at, details,
        actor:users!audit_log_actor_id_fkey (full_name),
        subject:users!audit_log_subject_id_fkey (full_name),
-       game:games (division_code, team_home, team_away, starts_at, field)`
+       game:games${scoped ? "!inner" : ""} (division_code, team_home, team_away, starts_at, field)`
     )
     .order("created_at", { ascending: false })
     .limit(500);
 
+  if (scoped && user.scope_divisions) {
+    query = query.in("game.division_code", user.scope_divisions);
+  }
   if (action) {
     query = query.eq("action", action);
   } else if (group) {

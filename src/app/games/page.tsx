@@ -39,13 +39,17 @@ export default async function GamesPage({
   const sb = supabaseServer();
   const nowIso = nowAsLeagueIso();
 
+  let gamesQuery = sb
+    .from("games")
+    .select("*")
+    .gte("starts_at", nowIso)
+    .order("starts_at", { ascending: true })
+    .limit(500);
+  if (user?.scope_divisions && user.scope_divisions.length) {
+    gamesQuery = gamesQuery.in("division_code", user.scope_divisions);
+  }
   const [{ data: gamesData, error: gamesErr }, { data: allActive, error: assnErr }] = await Promise.all([
-    sb
-      .from("games")
-      .select("*")
-      .gte("starts_at", nowIso)
-      .order("starts_at", { ascending: true })
-      .limit(500),
+    gamesQuery,
     sb
       .from("assignments")
       .select(

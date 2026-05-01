@@ -43,6 +43,7 @@ export interface User {
   email: string | null;
   phone: string | null;
   eligible_divisions: DivisionCode[];
+  scope_divisions: DivisionCode[] | null;
   avatar_url: string | null;
   is_active: boolean;
   created_at: string;

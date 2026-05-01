@@ -34,15 +34,19 @@ export default async function PayoutsPage() {
   const nowIso = nowAsLeagueIso();
 
   // Eligible: games that have started and have assignments in approved/confirmed/completed/paid
-  const { data: rows, error } = await sb
+  let payoutQuery = sb
     .from("assignments")
     .select(
       `id, status, paid_amount, paid_at,
-       game:games (id, division_code, team_home, team_away, field, starts_at, ends_at, ump_slots, pay_per_slot, status),
+       game:games!inner (id, division_code, team_home, team_away, field, starts_at, ends_at, ump_slots, pay_per_slot, status),
        umpire:users!assignments_umpire_id_fkey (id, full_name, phone, avatar_url)`
     )
     .in("status", ["approved", "confirmed", "completed", "paid"])
     .order("paid_at", { ascending: false, nullsFirst: true });
+  if (user.scope_divisions && user.scope_divisions.length) {
+    payoutQuery = payoutQuery.in("game.division_code", user.scope_divisions);
+  }
+  const { data: rows, error } = await payoutQuery;
 
   if (error) {
     return (
