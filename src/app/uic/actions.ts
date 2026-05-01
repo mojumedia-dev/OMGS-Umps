@@ -258,6 +258,95 @@ export async function undoPaid(formData: FormData): Promise<void> {
   revalidatePath("/dashboard");
 }
 
+export async function transferAssignment(formData: FormData): Promise<void> {
+  const assignmentId = String(formData.get("assignmentId") ?? "");
+  const newUmpId = String(formData.get("umpireId") ?? "");
+  if (!assignmentId || !newUmpId) throw new Error("Pick a target umpire");
+
+  const uic = await requireUic();
+  const sb = supabaseServer();
+
+  const { data: orig } = await sb
+    .from("assignments")
+    .select(
+      "id, umpire_id, game_id, status, game:games(id, starts_at, ends_at, division_code, team_home, team_away, field)"
+    )
+    .eq("id", assignmentId)
+    .in("status", ["requested", "assigned", "approved", "confirmed"])
+    .maybeSingle();
+  if (!orig?.game) throw new Error("Assignment not found");
+  if (orig.umpire_id === newUmpId) return;
+
+  const g = orig.game as unknown as {
+    id: string;
+    starts_at: string;
+    ends_at: string;
+    division_code: string;
+    team_home: string;
+    team_away: string;
+    field: string;
+  };
+  const slot = await loadSlotGames(g);
+  const slotIds = slot.map((sg) => sg.id);
+
+  // Conflict check on the receiving ump
+  const { data: theirActive } = await sb
+    .from("assignments")
+    .select("game:games(starts_at, ends_at)")
+    .eq("umpire_id", newUmpId)
+    .in("status", ["requested", "assigned", "approved", "confirmed"]);
+  type ActiveRow = { game: { starts_at: string; ends_at: string } | null };
+  for (const sg of slot) {
+    for (const a of (theirActive ?? []) as unknown as ActiveRow[]) {
+      if (!a.game) continue;
+      if (sg.starts_at < a.game.ends_at && sg.ends_at > a.game.starts_at) {
+        throw new Error("Target ump already has a game at that time");
+      }
+    }
+  }
+
+  const oldUmpId = orig.umpire_id;
+  const { error } = await sb
+    .from("assignments")
+    .update({ umpire_id: newUmpId })
+    .eq("umpire_id", oldUmpId)
+    .in("status", ["requested", "assigned", "approved", "confirmed"])
+    .in("game_id", slotIds);
+  if (error) throw error;
+
+  await sendPushToUser(newUmpId, {
+    title: `Game transferred to you`,
+    body: formatGameSummary(g),
+    url: "/dashboard",
+    tag: `transfer-${g.id}`,
+  });
+  await sendPushToUser(oldUmpId, {
+    title: `Game moved to another ump`,
+    body: formatGameSummary(g),
+    url: "/dashboard",
+    tag: `transfer-${g.id}`,
+  });
+
+  await logAudit({
+    action: "swap_execute",
+    actorId: uic.id,
+    subjectId: newUmpId,
+    gameId: g.id,
+    assignmentId,
+    details: {
+      transfer: true,
+      from_ump: oldUmpId,
+      to_ump: newUmpId,
+      bundle_size: slot.length,
+    },
+  });
+
+  revalidatePath("/uic");
+  revalidatePath("/uic/games");
+  revalidatePath("/dashboard");
+  revalidatePath("/games");
+}
+
 export async function toggleTournament(formData: FormData): Promise<void> {
   const gameId = String(formData.get("gameId") ?? "");
   if (!gameId) throw new Error("Missing gameId");

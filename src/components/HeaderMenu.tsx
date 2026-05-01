@@ -6,6 +6,7 @@ export default function HeaderMenu({
   signedIn,
   showApprovals,
   showAssign,
+  showRoster,
   showPayouts,
   showAudit,
   userButton,
@@ -13,6 +14,7 @@ export default function HeaderMenu({
   signedIn: boolean;
   showApprovals: boolean;
   showAssign: boolean;
+  showRoster: boolean;
   showPayouts: boolean;
   showAudit: boolean;
   userButton: React.ReactNode;
@@ -47,6 +49,11 @@ export default function HeaderMenu({
             {showApprovals && (
               <Link href="/uic" className={desktopLink}>
                 Approvals
+              </Link>
+            )}
+            {showRoster && (
+              <Link href="/uic/games" className={desktopLink}>
+                Roster
               </Link>
             )}
             {showAssign && (
@@ -106,6 +113,15 @@ export default function HeaderMenu({
               {showApprovals && (
                 <Link href="/uic" className={linkCls} onClick={() => setOpen(false)}>
                   Approvals
+                </Link>
+              )}
+              {showRoster && (
+                <Link
+                  href="/uic/games"
+                  className={linkCls}
+                  onClick={() => setOpen(false)}
+                >
+                  Roster
                 </Link>
               )}
               {showAssign && (

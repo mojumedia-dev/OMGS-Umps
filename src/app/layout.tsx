@@ -89,6 +89,7 @@ export default async function RootLayout({
                 signedIn={signedIn}
                 showApprovals={showApprovals}
                 showAssign={showAssign}
+                showRoster={showApprovals}
                 showPayouts={showPayouts}
                 showAudit={showAudit}
                 userButton={<UserButton />}
