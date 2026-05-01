@@ -34,7 +34,12 @@ type AssignmentRowLite = Pick<
 export default async function GamesPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ view?: string; focus?: string; scope?: string }>;
+  searchParams?: Promise<{
+    view?: string;
+    focus?: string;
+    scope?: string;
+    divisions?: string;
+  }>;
 }) {
   const { userId } = await auth();
   const user = userId ? await ensureCurrentUserRow() : null;
@@ -47,6 +52,9 @@ export default async function GamesPage({
     user?.role === "admin" && params.scope
       ? params.scope.split(",").filter(Boolean)
       : null;
+  const divisionFilter = params.divisions
+    ? params.divisions.split(",").filter(Boolean)
+    : null;
 
   const sb = supabaseServer();
   const nowIso = nowAsLeagueIso();
@@ -68,9 +76,19 @@ export default async function GamesPage({
     .order("starts_at", { ascending: true })
     .limit(500);
   const effectiveScope = adminScope ?? user?.scope_divisions ?? null;
-  if (effectiveScope && effectiveScope.length) {
-    gamesQuery = gamesQuery.in("division_code", effectiveScope);
+  // Combine scope (hard filter) with the optional divisions chip filter
+  let activeDivisions: string[] | null = null;
+  if (effectiveScope?.length && divisionFilter?.length) {
+    activeDivisions = effectiveScope.filter((d) => divisionFilter.includes(d));
+  } else {
+    activeDivisions = divisionFilter ?? effectiveScope ?? null;
   }
+  if (activeDivisions && activeDivisions.length) {
+    gamesQuery = gamesQuery.in("division_code", activeDivisions);
+  }
+  // Set of divisions the user is allowed to see (for chip rendering)
+  const allowedDivisions =
+    effectiveScope ?? ["8U", "10U", "12U", "14U", "16U", "18U"];
   const [{ data: gamesData, error: gamesErr }, { data: allActive, error: assnErr }] = await Promise.all([
     gamesQuery,
     sb
@@ -185,6 +203,53 @@ export default async function GamesPage({
             >
               Clear
             </Link>
+          </div>
+        )}
+
+        {allowedDivisions.length > 1 && (
+          <div className="mb-4 flex flex-wrap gap-1.5">
+            {(() => {
+              const baseQs = new URLSearchParams();
+              if (view === "month") baseQs.set("view", "month");
+              if (adminScope) baseQs.set("scope", adminScope.join(","));
+              const allHref = baseQs.toString()
+                ? `/games?${baseQs.toString()}`
+                : "/games";
+              const allActive = !divisionFilter || divisionFilter.length === 0;
+              return (
+                <>
+                  <Link
+                    href={allHref}
+                    className={`inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition-colors ${
+                      allActive
+                        ? "bg-brand-600 text-white"
+                        : "border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100"
+                    }`}
+                  >
+                    All
+                  </Link>
+                  {allowedDivisions.map((d) => {
+                    const qs = new URLSearchParams(baseQs);
+                    qs.set("divisions", d);
+                    const active =
+                      divisionFilter?.length === 1 && divisionFilter[0] === d;
+                    return (
+                      <Link
+                        key={d}
+                        href={`/games?${qs.toString()}`}
+                        className={`inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition-colors ${
+                          active
+                            ? "bg-brand-600 text-white"
+                            : "border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100"
+                        }`}
+                      >
+                        {d}
+                      </Link>
+                    );
+                  })}
+                </>
+              );
+            })()}
           </div>
         )}
 
