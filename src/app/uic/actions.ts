@@ -92,15 +92,15 @@ export async function approveRequest(formData: FormData): Promise<void> {
       url: "/dashboard",
       tag: `approved-${g.id}`,
     });
-    for (const a of approved ?? []) {
-      await logAudit({
-        action: "approve",
-        actorId: uic.id,
-        subjectId: orig.umpire_id,
-        gameId: a.game_id,
-        assignmentId: a.id,
-      });
-    }
+    // One audit entry per bundle, not per assignment
+    await logAudit({
+      action: "approve",
+      actorId: uic.id,
+      subjectId: orig.umpire_id,
+      gameId: g.id,
+      assignmentId,
+      details: slot.length > 1 ? { bundle_size: slot.length } : undefined,
+    });
   }
 
   revalidatePath("/uic");
@@ -155,15 +155,14 @@ export async function declineRequest(formData: FormData): Promise<void> {
       url: "/games",
       tag: `declined-${g.id}`,
     });
-    for (const a of declined ?? []) {
-      await logAudit({
-        action: "decline",
-        actorId: uic.id,
-        subjectId: orig.umpire_id,
-        gameId: a.game_id,
-        assignmentId: a.id,
-      });
-    }
+    await logAudit({
+      action: "decline",
+      actorId: uic.id,
+      subjectId: orig.umpire_id,
+      gameId: g.id,
+      assignmentId,
+      details: slot.length > 1 ? { bundle_size: slot.length } : undefined,
+    });
   }
 
   revalidatePath("/uic");

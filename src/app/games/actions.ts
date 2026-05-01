@@ -102,14 +102,15 @@ export async function requestGame(formData: FormData): Promise<void> {
     .select("id, game_id");
   if (error && error.code !== "23505") throw error;
 
-  // Audit one row per created assignment, but pushed once for the bundle
-  for (const a of created ?? []) {
+  // One audit entry per request action, not per game in the bundle
+  const primary = (created ?? [])[0];
+  if (primary) {
     await logAudit({
       action: "request",
       actorId: user.id,
       subjectId: user.id,
-      gameId: a.game_id,
-      assignmentId: a.id,
+      gameId: primary.game_id,
+      assignmentId: primary.id,
       details: slot.length > 1 ? { bundle_size: slot.length } : undefined,
     });
   }
@@ -207,14 +208,20 @@ export async function cancelMyRequest(formData: FormData): Promise<void> {
     .select("id, game_id");
   if (error) throw error;
 
-  for (const a of cancelled ?? []) {
-    await refreshGameStatus(a.game_id);
+  const cancelledList = cancelled ?? [];
+  for (const a of cancelledList) await refreshGameStatus(a.game_id);
+  const primaryCancel = cancelledList[0];
+  if (primaryCancel) {
     await logAudit({
       action: "cancel",
       actorId: user.id,
       subjectId: user.id,
-      gameId: a.game_id,
-      assignmentId: a.id,
+      gameId: primaryCancel.game_id,
+      assignmentId: primaryCancel.id,
+      details:
+        cancelledList.length > 1
+          ? { bundle_size: cancelledList.length }
+          : undefined,
     });
   }
 
