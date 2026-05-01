@@ -64,8 +64,30 @@ export default async function UicQueuePage() {
     );
   }
 
-  const requests = (rows ?? []) as unknown as RequestRow[];
-  const grouped = new Map<string, RequestRow[]>();
+  const allRequests = (rows ?? []) as unknown as RequestRow[];
+
+  // Dedupe by slot: same ump + same date + same field + same division shows
+  // as a single card. Approving/declining cascades server-side.
+  const slotSeen = new Map<string, RequestRow & { bundleSize: number }>();
+  for (const r of allRequests) {
+    if (!r.game || !r.umpire) continue;
+    const key = `${r.umpire.id}_${r.game.starts_at.slice(0, 10)}_${r.game.field}_${r.game.division_code}`;
+    const existing = slotSeen.get(key);
+    if (!existing) {
+      slotSeen.set(key, { ...r, bundleSize: 1 });
+    } else {
+      existing.bundleSize += 1;
+      // Keep the earliest game in the slot as the visible card
+      if (r.game.starts_at < (existing.game?.starts_at ?? "")) {
+        slotSeen.set(key, { ...r, bundleSize: existing.bundleSize });
+      }
+    }
+  }
+  const requests = [...slotSeen.values()].sort((a, b) =>
+    a.requested_at < b.requested_at ? -1 : 1
+  );
+
+  const grouped = new Map<string, typeof requests>();
   for (const r of requests) {
     if (!r.game) continue;
     const key = formatGameDateKey(r.game.starts_at);
@@ -82,6 +104,9 @@ export default async function UicQueuePage() {
           </h1>
           <p className="mt-1 text-sm text-zinc-600">
             {requests.length} awaiting your review
+            {allRequests.length > requests.length
+              ? ` (${allRequests.length} games bundled)`
+              : ""}
           </p>
         </div>
 
@@ -126,6 +151,11 @@ export default async function UicQueuePage() {
                             <div className="mt-1 truncate text-sm font-medium text-zinc-900">
                               {g.team_home} vs {g.team_away}
                             </div>
+                            {r.bundleSize > 1 && (
+                              <div className="mt-1 inline-flex h-5 items-center rounded-full bg-brand-100 px-2 text-[10px] font-bold text-brand-800">
+                                Bundle: {r.bundleSize} games
+                              </div>
+                            )}
                             <div className="mt-2 flex items-center gap-2.5 text-sm">
                               {r.umpire?.avatar_url ? (
                                 // eslint-disable-next-line @next/next/no-img-element

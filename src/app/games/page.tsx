@@ -27,7 +27,7 @@ const ACTIVE_STATUSES: Assignment["status"][] = [
 export default async function GamesPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ view?: string; focus?: string }>;
+  searchParams?: Promise<{ view?: string; focus?: string; scope?: string }>;
 }) {
   const { userId } = await auth();
   const user = userId ? await ensureCurrentUserRow() : null;
@@ -35,6 +35,11 @@ export default async function GamesPage({
   const params = (await searchParams) ?? {};
   const view = params.view === "month" ? "month" : "list";
   const focus = params.focus ?? null;
+  // Admins can preview a scoped view, e.g. ?scope=8U
+  const adminScope =
+    user?.role === "admin" && params.scope
+      ? params.scope.split(",").filter(Boolean)
+      : null;
 
   const sb = supabaseServer();
   const nowIso = nowAsLeagueIso();
@@ -45,8 +50,9 @@ export default async function GamesPage({
     .gte("starts_at", nowIso)
     .order("starts_at", { ascending: true })
     .limit(500);
-  if (user?.scope_divisions && user.scope_divisions.length) {
-    gamesQuery = gamesQuery.in("division_code", user.scope_divisions);
+  const effectiveScope = adminScope ?? user?.scope_divisions ?? null;
+  if (effectiveScope && effectiveScope.length) {
+    gamesQuery = gamesQuery.in("division_code", effectiveScope);
   }
   const [{ data: gamesData, error: gamesErr }, { data: allActive, error: assnErr }] = await Promise.all([
     gamesQuery,
@@ -151,6 +157,20 @@ export default async function GamesPage({
               Sign in
             </Link>{" "}
             <span className="text-amber-800">to request games.</span>
+          </div>
+        )}
+
+        {adminScope && (
+          <div className="mb-6 flex items-center justify-between rounded-lg border border-brand-200 bg-brand-50 px-4 py-2 text-xs">
+            <span className="font-semibold text-brand-800">
+              Previewing {adminScope.join(", ")} scope
+            </span>
+            <Link
+              href="/games"
+              className="font-semibold text-brand-700 underline-offset-2 hover:underline"
+            >
+              Clear
+            </Link>
           </div>
         )}
 

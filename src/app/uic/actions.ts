@@ -6,6 +6,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { refreshGameStatus } from "@/lib/db/game-status";
 import { sendPushToUser } from "@/lib/push/send";
 import { logAudit } from "@/lib/audit/log";
+import { loadSlotGames } from "@/lib/db/slots";
 
 function formatGameSummary(g: {
   division_code: string;
@@ -41,43 +42,65 @@ export async function approveRequest(formData: FormData): Promise<void> {
   const uic = await requireUic();
 
   const sb = supabaseServer();
-  const { data: a, error } = await sb
+
+  // Load the original assignment + game to identify the slot
+  const { data: orig } = await sb
+    .from("assignments")
+    .select(
+      "id, umpire_id, game_id, game:games(id, starts_at, ends_at, division_code, team_home, team_away, field)"
+    )
+    .eq("id", assignmentId)
+    .eq("status", "requested")
+    .maybeSingle();
+  if (!orig?.game) return;
+
+  const g = orig.game as unknown as {
+    id: string;
+    starts_at: string;
+    ends_at: string;
+    division_code: string;
+    team_home: string;
+    team_away: string;
+    field: string;
+  };
+  const slot = await loadSlotGames(g);
+  const slotIds = slot.map((sg) => sg.id);
+
+  // Approve every requested assignment by this ump in the slot
+  const { data: approved, error } = await sb
     .from("assignments")
     .update({
       status: "approved",
       approved_at: new Date().toISOString(),
       approved_by: uic.id,
     })
-    .eq("id", assignmentId)
+    .eq("umpire_id", orig.umpire_id)
     .eq("status", "requested")
-    .select(
-      "game_id, umpire_id, game:games(division_code, team_home, team_away, field, starts_at)"
-    )
-    .single();
+    .in("game_id", slotIds)
+    .select("id, game_id");
   if (error) throw error;
-  if (a?.game_id) await refreshGameStatus(a.game_id);
 
-  if (a?.umpire_id && a.game) {
-    const g = a.game as unknown as {
-      division_code: string;
-      team_home: string;
-      team_away: string;
-      field: string;
-      starts_at: string;
-    };
-    await sendPushToUser(a.umpire_id, {
-      title: "Game approved ✅",
+  for (const a of approved ?? []) await refreshGameStatus(a.game_id);
+
+  if (orig.umpire_id) {
+    await sendPushToUser(orig.umpire_id, {
+      title:
+        slot.length > 1
+          ? `Approved ✅ ${slot.length} games`
+          : "Game approved ✅",
       body: formatGameSummary(g),
       url: "/dashboard",
-      tag: `approved-${a.game_id}`,
+      tag: `approved-${g.id}`,
     });
-    await logAudit({
-      action: "approve",
-      actorId: uic.id,
-      subjectId: a.umpire_id,
-      gameId: a.game_id,
-      assignmentId,
-    });
+    for (const a of approved ?? []) {
+      await logAudit({
+        action: "approve",
+        actorId: uic.id,
+        subjectId: orig.umpire_id,
+        gameId: a.game_id,
+        assignmentId: a.id,
+      });
+    }
   }
 
   revalidatePath("/uic");
@@ -91,39 +114,56 @@ export async function declineRequest(formData: FormData): Promise<void> {
   const uic = await requireUic();
 
   const sb = supabaseServer();
-  const { data: a, error } = await sb
+
+  const { data: orig } = await sb
     .from("assignments")
-    .update({ status: "declined" })
+    .select(
+      "id, umpire_id, game_id, game:games(id, starts_at, ends_at, division_code, team_home, team_away, field)"
+    )
     .eq("id", assignmentId)
     .eq("status", "requested")
-    .select(
-      "game_id, umpire_id, game:games(division_code, team_home, team_away, field, starts_at)"
-    )
-    .single();
-  if (error) throw error;
-  if (a?.game_id) await refreshGameStatus(a.game_id);
+    .maybeSingle();
+  if (!orig?.game) return;
 
-  if (a?.umpire_id && a.game) {
-    const g = a.game as unknown as {
-      division_code: string;
-      team_home: string;
-      team_away: string;
-      field: string;
-      starts_at: string;
-    };
-    await sendPushToUser(a.umpire_id, {
+  const g = orig.game as unknown as {
+    id: string;
+    starts_at: string;
+    ends_at: string;
+    division_code: string;
+    team_home: string;
+    team_away: string;
+    field: string;
+  };
+  const slot = await loadSlotGames(g);
+  const slotIds = slot.map((sg) => sg.id);
+
+  const { data: declined, error } = await sb
+    .from("assignments")
+    .update({ status: "declined" })
+    .eq("umpire_id", orig.umpire_id)
+    .eq("status", "requested")
+    .in("game_id", slotIds)
+    .select("id, game_id");
+  if (error) throw error;
+
+  for (const a of declined ?? []) await refreshGameStatus(a.game_id);
+
+  if (orig.umpire_id) {
+    await sendPushToUser(orig.umpire_id, {
       title: "Request declined",
       body: formatGameSummary(g),
       url: "/games",
-      tag: `declined-${a.game_id}`,
+      tag: `declined-${g.id}`,
     });
-    await logAudit({
-      action: "decline",
-      actorId: uic.id,
-      subjectId: a.umpire_id,
-      gameId: a.game_id,
-      assignmentId,
-    });
+    for (const a of declined ?? []) {
+      await logAudit({
+        action: "decline",
+        actorId: uic.id,
+        subjectId: orig.umpire_id,
+        gameId: a.game_id,
+        assignmentId: a.id,
+      });
+    }
   }
 
   revalidatePath("/uic");
