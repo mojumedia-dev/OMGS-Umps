@@ -130,11 +130,10 @@ export default async function GamesPage({
           </div>
         )}
 
-        {view === "month" && (
+        {view === "month" ? (
           <MonthGrid grouped={grouped} assignmentsByGame={assignmentsByGame} />
-        )}
-
-        <div className={`space-y-3 ${view === "month" ? "mt-8" : ""}`}>
+        ) : (
+        <div className="space-y-3">
           {[...grouped.entries()].map(([dateKey, dayGames]) => {
             const total = dayGames.length;
             const openForDay = dayGames.filter((g) => {
@@ -256,6 +255,7 @@ export default async function GamesPage({
             );
           })}
         </div>
+        )}
       </div>
     </main>
   );
