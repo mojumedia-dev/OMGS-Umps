@@ -432,9 +432,15 @@ function ManageMonthGrid({
                   return filled < g.ump_slots;
                 }).length;
                 const isToday = cell.key === todayKey;
+                const cellBg =
+                  total === 0
+                    ? "bg-white"
+                    : openForDay > 0
+                    ? "bg-amber-50"
+                    : "bg-lime-50";
                 const inner = (
                   <div
-                    className={`flex h-full flex-col bg-white p-1.5 sm:p-2 ${
+                    className={`flex h-full flex-col p-1.5 sm:p-2 ${cellBg} ${
                       isToday ? "ring-2 ring-inset ring-brand-600" : ""
                     }`}
                   >
@@ -447,20 +453,24 @@ function ManageMonthGrid({
                     </span>
                     {total > 0 && (
                       <div className="mt-auto flex flex-col gap-0.5 text-[10px] leading-tight">
-                        <span className="rounded bg-brand-100 px-1 font-bold text-brand-800">
-                          {total} game{total === 1 ? "" : "s"}
-                        </span>
-                        {openForDay > 0 && (
-                          <span className="rounded bg-amber-100 px-1 font-semibold text-amber-900">
+                        {openForDay > 0 ? (
+                          <span className="rounded bg-amber-200 px-1 font-bold text-amber-900">
                             {openForDay} open
                           </span>
+                        ) : (
+                          <span className="rounded bg-lime-200 px-1 font-bold text-brand-900">
+                            full
+                          </span>
                         )}
+                        <span className="text-[9px] text-zinc-600">
+                          {total} total
+                        </span>
                       </div>
                     )}
                   </div>
                 );
                 return (
-                  <div key={i} className="aspect-square min-h-12">
+                  <div key={i} className="min-h-16 sm:aspect-square">
                     {total > 0 ? (
                       <Link
                         href={`/uic/games?focus=${cell.key}`}
