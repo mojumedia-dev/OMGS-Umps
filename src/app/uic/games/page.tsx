@@ -22,10 +22,24 @@ type AssignmentRow = {
   umpire: { id: string; full_name: string; avatar_url: string | null } | null;
 };
 
+function buildHref(opts: { view?: string; ump?: string; divisions?: string }): string {
+  const qs = new URLSearchParams();
+  if (opts.view && opts.view !== "list") qs.set("view", opts.view);
+  if (opts.ump) qs.set("ump", opts.ump);
+  if (opts.divisions) qs.set("divisions", opts.divisions);
+  const s = qs.toString();
+  return s ? `/uic/games?${s}` : "/uic/games";
+}
+
 export default async function ManageGamesPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ view?: string; focus?: string }>;
+  searchParams?: Promise<{
+    view?: string;
+    focus?: string;
+    ump?: string;
+    divisions?: string;
+  }>;
 }) {
   const user = await ensureCurrentUserRow();
   if (!user) redirect("/sign-in");
@@ -34,16 +48,37 @@ export default async function ManageGamesPage({
   const params = (await searchParams) ?? {};
   const view = params.view === "month" ? "month" : "list";
   const focus = params.focus ?? null;
+  const filterUmp = params.ump ?? "";
+  const filterDivisions = params.divisions
+    ? params.divisions.split(",").filter(Boolean)
+    : [];
 
   const sb = supabaseServer();
   const nowIso = nowAsLeagueIso();
 
-  const { data: gamesData } = await sb
+  // If a ump filter is set, fetch their game IDs first to constrain the games query
+  let umpGameIds: string[] | null = null;
+  if (filterUmp) {
+    const { data: theirAssn } = await sb
+      .from("assignments")
+      .select("game_id")
+      .eq("umpire_id", filterUmp)
+      .in("status", ["requested", "assigned", "approved", "confirmed", "paid"]);
+    umpGameIds = (theirAssn ?? []).map((a) => a.game_id);
+    if (umpGameIds.length === 0) umpGameIds = ["__none__"]; // forces empty result
+  }
+
+  let gamesQuery = sb
     .from("games")
     .select("*")
     .gte("starts_at", nowIso)
     .order("starts_at", { ascending: true })
     .limit(500);
+  if (filterDivisions.length) {
+    gamesQuery = gamesQuery.in("division_code", filterDivisions);
+  }
+  if (umpGameIds) gamesQuery = gamesQuery.in("id", umpGameIds);
+  const { data: gamesData } = await gamesQuery;
   const games = (gamesData ?? []) as Game[];
 
   const gameIds = games.map((g) => g.id);
@@ -87,7 +122,7 @@ export default async function ManageGamesPage({
   return (
     <main className="flex-1 px-4 py-8 sm:px-6">
       <div className="mx-auto w-full max-w-3xl">
-        <div className="mb-6 flex items-end justify-between">
+        <div className="mb-4 flex items-end justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
               Manage assignments
@@ -98,7 +133,7 @@ export default async function ManageGamesPage({
           </div>
           <div className="flex rounded-md border border-zinc-300 bg-white p-0.5 text-xs font-bold">
             <Link
-              href="/uic/games"
+              href={buildHref({ view: "list", ump: filterUmp, divisions: filterDivisions.join(",") })}
               className={`inline-flex h-8 items-center rounded px-3 transition-colors ${
                 view === "list"
                   ? "bg-brand-600 text-white"
@@ -108,7 +143,7 @@ export default async function ManageGamesPage({
               List
             </Link>
             <Link
-              href="/uic/games?view=month"
+              href={buildHref({ view: "month", ump: filterUmp, divisions: filterDivisions.join(",") })}
               className={`inline-flex h-8 items-center rounded px-3 transition-colors ${
                 view === "month"
                   ? "bg-brand-600 text-white"
@@ -119,6 +154,61 @@ export default async function ManageGamesPage({
             </Link>
           </div>
         </div>
+
+        <form
+          method="GET"
+          className="mb-6 grid grid-cols-1 gap-3 rounded-lg border border-zinc-200 bg-white p-3 sm:grid-cols-3"
+        >
+          {view === "month" && (
+            <input type="hidden" name="view" value="month" />
+          )}
+          <label className="block">
+            <span className="text-xs font-semibold text-zinc-700">Ump</span>
+            <select
+              name="ump"
+              defaultValue={filterUmp}
+              className="mt-1 h-9 w-full rounded-md border border-zinc-300 bg-white px-2 text-sm"
+            >
+              <option value="">All umps</option>
+              {roster.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.full_name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-zinc-700">Division</span>
+            <select
+              name="divisions"
+              defaultValue={filterDivisions[0] ?? ""}
+              className="mt-1 h-9 w-full rounded-md border border-zinc-300 bg-white px-2 text-sm"
+            >
+              <option value="">All divisions</option>
+              {(["8U", "10U", "12U", "14U", "16U", "18U"] as const).map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex items-end gap-2">
+            <button
+              type="submit"
+              className="inline-flex h-9 items-center rounded-md bg-brand-600 px-3 text-xs font-bold text-white hover:bg-brand-700"
+            >
+              Apply
+            </button>
+            {(filterUmp || filterDivisions.length > 0) && (
+              <Link
+                href="/uic/games"
+                className="inline-flex h-9 items-center text-xs font-semibold text-zinc-600 underline-offset-2 hover:underline"
+              >
+                Clear
+              </Link>
+            )}
+          </div>
+        </form>
 
         {view === "month" ? (
           <ManageMonthGrid grouped={grouped} assignmentsByGame={assignmentsByGame} />
