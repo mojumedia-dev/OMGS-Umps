@@ -35,11 +35,13 @@ export function slotKey(g: Pick<SlotGame, "starts_at" | "field" | "division_code
 }
 
 /**
- * For a game, return all games in its slot. On weekend a slot is just the one
- * game. On weekday, all same-date+field+division games are bundled.
+ * Return all games in the slot — same-date+field+division. Used for both
+ * weekday auto-bundle (request creates assignments for every slot game) and
+ * cascade operations (cancel/approve/decline always sweep the slot for the
+ * SAME ump). The weekday-vs-weekend difference lives in the request flow
+ * itself, not here.
  */
 export async function loadSlotGames(game: SlotGame): Promise<SlotGame[]> {
-  if (!isWeekday(game.starts_at)) return [game];
   return loadSameDayFieldDivision(game);
 }
 

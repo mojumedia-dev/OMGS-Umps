@@ -5,7 +5,7 @@ import { ensureCurrentUserRow } from "@/lib/users";
 import { supabaseServer } from "@/lib/supabase/server";
 import { refreshGameStatus } from "@/lib/db/game-status";
 import { logAudit } from "@/lib/audit/log";
-import { loadSlotGames } from "@/lib/db/slots";
+import { loadSlotGames, isWeekday } from "@/lib/db/slots";
 
 async function tryRequestGameId(
   sb: ReturnType<typeof supabaseServer>,
@@ -68,8 +68,9 @@ export async function requestGame(formData: FormData): Promise<void> {
     );
   }
 
-  // Bundle: weekday games auto-include same-date+field+division siblings
-  const slot = await loadSlotGames(game);
+  // Bundle: weekday games auto-include same-date+field+division siblings.
+  // Weekends only request the single game (extras come from the popup).
+  const slot = isWeekday(game.starts_at) ? await loadSlotGames(game) : [game];
 
   // Time-conflict guard: ump can't double-book themselves on any slot game
   const { data: myActive } = await sb
