@@ -56,6 +56,17 @@ export async function requestGame(formData: FormData): Promise<void> {
       `You're not eligible for ${game.division_code}. Update your profile to add it.`
     );
   }
+  // Assignment-only divisions: only board can place umps (8U)
+  const { data: divRow } = await sb
+    .from("divisions")
+    .select("assignment_only")
+    .eq("code", game.division_code)
+    .maybeSingle();
+  if (divRow?.assignment_only) {
+    throw new Error(
+      `${game.division_code} games are assigned by the board, not requested.`
+    );
+  }
 
   // Bundle: weekday games auto-include same-date+field+division siblings
   const slot = await loadSlotGames(game);

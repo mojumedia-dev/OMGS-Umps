@@ -5,12 +5,14 @@ import { useEffect, useState } from "react";
 export default function HeaderMenu({
   signedIn,
   showApprovals,
+  showAssign,
   showPayouts,
   showAudit,
   userButton,
 }: {
   signedIn: boolean;
   showApprovals: boolean;
+  showAssign: boolean;
   showPayouts: boolean;
   showAudit: boolean;
   userButton: React.ReactNode;
@@ -45,6 +47,11 @@ export default function HeaderMenu({
             {showApprovals && (
               <Link href="/uic" className={desktopLink}>
                 Approvals
+              </Link>
+            )}
+            {showAssign && (
+              <Link href="/assign" className={desktopLink}>
+                Assign
               </Link>
             )}
             {showPayouts && (
@@ -99,6 +106,11 @@ export default function HeaderMenu({
               {showApprovals && (
                 <Link href="/uic" className={linkCls} onClick={() => setOpen(false)}>
                   Approvals
+                </Link>
+              )}
+              {showAssign && (
+                <Link href="/assign" className={linkCls} onClick={() => setOpen(false)}>
+                  Assign
                 </Link>
               )}
               {showPayouts && (

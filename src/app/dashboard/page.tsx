@@ -5,6 +5,7 @@ import { ensureCurrentUserRow } from "@/lib/users";
 import { supabaseServer } from "@/lib/supabase/server";
 import { cancelMyRequest } from "@/app/games/actions";
 import { proposeSwap, acceptSwap, declineSwap, cancelSwap } from "./swap-actions";
+import { acceptAssignment, declineAssignment } from "@/app/assign/actions";
 import { LEAGUE_VENUE } from "@/lib/league";
 import {
   formatGameDate,
@@ -43,7 +44,7 @@ export default async function DashboardPage() {
                      starts_at, ends_at, ump_slots, pay_per_slot)`
       )
       .eq("umpire_id", user.id)
-      .in("status", ["requested", "approved", "confirmed"])
+      .in("status", ["requested", "assigned", "approved", "confirmed"])
       .order("game(starts_at)", { ascending: true }),
     sb
       .from("games")
@@ -423,13 +424,18 @@ export default async function DashboardPage() {
                     const tone =
                       r.status === "requested"
                         ? "bg-amber-100 text-amber-900"
+                        : r.status === "assigned"
+                        ? "bg-amber-100 text-amber-900"
                         : "bg-lime-200 text-brand-900";
                     const label =
                       r.status === "requested"
                         ? "Pending UIC"
+                        : r.status === "assigned"
+                        ? "Awaiting your accept"
                         : r.status === "approved"
                         ? "Approved"
                         : "Confirmed";
+                    const isAssigned = r.status === "assigned";
                     const outSwap = outgoingByAssignment.get(r.id);
                     const canSwap =
                       (r.status === "approved" || r.status === "confirmed") &&
@@ -471,6 +477,36 @@ export default async function DashboardPage() {
                             >
                               {label}
                             </span>
+                            {isAssigned && (
+                              <div className="flex gap-1">
+                                <form action={acceptAssignment}>
+                                  <input
+                                    type="hidden"
+                                    name="assignmentId"
+                                    value={r.id}
+                                  />
+                                  <button
+                                    type="submit"
+                                    className="inline-flex h-7 items-center rounded-md bg-lime-400 px-2 text-[11px] font-bold text-brand-900 hover:bg-lime-500"
+                                  >
+                                    Accept
+                                  </button>
+                                </form>
+                                <form action={declineAssignment}>
+                                  <input
+                                    type="hidden"
+                                    name="assignmentId"
+                                    value={r.id}
+                                  />
+                                  <button
+                                    type="submit"
+                                    className="inline-flex h-7 items-center rounded-md border border-zinc-300 bg-white px-2 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-100"
+                                  >
+                                    Decline
+                                  </button>
+                                </form>
+                              </div>
+                            )}
                             {outSwap && (
                               <span className="inline-flex h-6 items-center rounded-full bg-amber-100 px-2 text-[10px] font-semibold text-amber-900">
                                 Swap → {outSwap.target?.full_name?.split(" ")[0] ?? ""}

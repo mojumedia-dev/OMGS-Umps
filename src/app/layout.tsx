@@ -57,6 +57,7 @@ export default async function RootLayout({
   }
   const signedIn = !!userId;
   const showApprovals = role === "uic" || role === "admin";
+  const showAssign = role === "board" || role === "admin";
   const showPayouts = role === "board" || role === "admin";
   const showAudit =
     role === "uic" || role === "admin" || role === "board";
@@ -87,6 +88,7 @@ export default async function RootLayout({
               <HeaderMenu
                 signedIn={signedIn}
                 showApprovals={showApprovals}
+                showAssign={showAssign}
                 showPayouts={showPayouts}
                 showAudit={showAudit}
                 userButton={<UserButton />}

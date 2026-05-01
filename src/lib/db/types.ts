@@ -11,6 +11,7 @@ export type GameStatus =
 
 export type AssignmentStatus =
   | "requested"
+  | "assigned"
   | "approved"
   | "declined"
   | "confirmed"
@@ -33,6 +34,7 @@ export interface Division {
   tournament_pay_per_slot: number;
   tournament_ump_slots: number;
   display_order: number;
+  assignment_only: boolean;
 }
 
 export interface User {

@@ -219,8 +219,24 @@ export default async function GamesPage({
                     </span>
                   </div>
                 </summary>
-                <ul className="divide-y divide-zinc-200 border-t border-zinc-200">
-                {dayGames.map((g) => {
+                <div className="border-t border-zinc-200">
+                {(() => {
+                  // Group by field, then by division within each field, sorted by time
+                  const byField = new Map<string, Game[]>();
+                  for (const g of dayGames) {
+                    if (!byField.has(g.field)) byField.set(g.field, []);
+                    byField.get(g.field)!.push(g);
+                  }
+                  const sortedFields = [...byField.entries()].sort(
+                    ([a], [b]) => a.localeCompare(b)
+                  );
+                  return sortedFields.map(([field, fieldGames]) => (
+                    <div key={field}>
+                      <div className="bg-zinc-50 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wide text-zinc-600">
+                        {field}
+                      </div>
+                      <ul className="divide-y divide-zinc-200">
+                        {fieldGames.map((g) => {
                   const gameAssignments = assignmentsByGame.get(g.id) ?? [];
                   const filled = gameAssignments.length;
                   const remaining = g.ump_slots - filled;
@@ -314,7 +330,11 @@ export default async function GamesPage({
                     </li>
                   );
                 })}
-                </ul>
+                      </ul>
+                    </div>
+                  ));
+                })()}
+                </div>
               </details>
             );
           })}
@@ -642,7 +662,7 @@ function GameAction({
             You'll request this game.
           </p>
           <p className="mt-2 text-[11px] font-semibold text-zinc-700">
-            Take any of these too?
+            Other {game.division_code} games at {game.field} that day — take any?
           </p>
           <ul className="mt-1 space-y-1.5">
             {weekendSiblings.map((s) => {
