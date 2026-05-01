@@ -66,33 +66,50 @@ export default async function UicQueuePage() {
 
   const allRequests = (rows ?? []) as unknown as RequestRow[];
 
-  // Dedupe by slot: same ump + same date + same field + same division shows
-  // as a single card. Approving/declining cascades server-side.
-  const slotSeen = new Map<string, RequestRow & { bundleSize: number }>();
+  // Group requests by slot (same ump + date + field + division) so a bundle
+  // appears as ONE card listing every game in it. Approving any one cascades
+  // through the whole slot via the slot logic in the action.
+  type Bundle = {
+    primary: RequestRow;
+    games: NonNullable<RequestRow["game"]>[];
+    requested_at: string;
+  };
+  const slotMap = new Map<string, Bundle>();
   for (const r of allRequests) {
     if (!r.game || !r.umpire) continue;
     const key = `${r.umpire.id}_${r.game.starts_at.slice(0, 10)}_${r.game.field}_${r.game.division_code}`;
-    const existing = slotSeen.get(key);
+    const existing = slotMap.get(key);
     if (!existing) {
-      slotSeen.set(key, { ...r, bundleSize: 1 });
+      slotMap.set(key, {
+        primary: r,
+        games: [r.game],
+        requested_at: r.requested_at,
+      });
     } else {
-      existing.bundleSize += 1;
-      // Keep the earliest game in the slot as the visible card
-      if (r.game.starts_at < (existing.game?.starts_at ?? "")) {
-        slotSeen.set(key, { ...r, bundleSize: existing.bundleSize });
+      existing.games.push(r.game);
+      // Keep the earliest game's assignment as the action target
+      if (r.game.starts_at < (existing.primary.game?.starts_at ?? "")) {
+        existing.primary = r;
+      }
+      if (r.requested_at < existing.requested_at) {
+        existing.requested_at = r.requested_at;
       }
     }
   }
-  const requests = [...slotSeen.values()].sort((a, b) =>
+  // Sort each bundle's games by start time
+  for (const b of slotMap.values()) {
+    b.games.sort((a, b) => (a.starts_at < b.starts_at ? -1 : 1));
+  }
+  const bundles = [...slotMap.values()].sort((a, b) =>
     a.requested_at < b.requested_at ? -1 : 1
   );
 
-  const grouped = new Map<string, typeof requests>();
-  for (const r of requests) {
-    if (!r.game) continue;
-    const key = formatGameDateKey(r.game.starts_at);
+  const grouped = new Map<string, Bundle[]>();
+  for (const b of bundles) {
+    if (!b.primary.game) continue;
+    const key = formatGameDateKey(b.primary.game.starts_at);
     if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key)!.push(r);
+    grouped.get(key)!.push(b);
   }
 
   return (
@@ -103,14 +120,14 @@ export default async function UicQueuePage() {
             Pending requests
           </h1>
           <p className="mt-1 text-sm text-zinc-600">
-            {requests.length} awaiting your review
-            {allRequests.length > requests.length
+            {bundles.length} awaiting your review
+            {allRequests.length > bundles.length
               ? ` (${allRequests.length} games bundled)`
               : ""}
           </p>
         </div>
 
-        {requests.length === 0 ? (
+        {bundles.length === 0 ? (
           <div className="rounded-lg border border-dashed border-zinc-300 bg-white p-8 text-center">
             <p className="text-sm text-zinc-700">No pending requests. Inbox zero.</p>
           </div>
@@ -119,43 +136,57 @@ export default async function UicQueuePage() {
             {[...grouped.entries()].map(([dateKey, items]) => (
               <section key={dateKey}>
                 <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                  {formatGameDate(items[0].game!.starts_at)}
+                  {formatGameDate(items[0].games[0].starts_at)}
                 </h2>
                 <ul className="divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white">
-                  {items.map((r) => {
-                    const g = r.game!;
+                  {items.map((b) => {
+                    const r = b.primary;
+                    const firstGame = b.games[0];
+                    const isBundle = b.games.length > 1;
                     return (
                       <li key={r.id} className="px-4 py-4">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
                               <span className="inline-flex h-5 items-center rounded bg-brand-600 px-1.5 text-[11px] font-bold text-white">
-                                {g.division_code}
+                                {firstGame.division_code}
                               </span>
-                              <span className="text-sm text-zinc-500">
-                                {formatGameTime(g.starts_at)} ·{" "}
-                                <a
-                                  href={LEAGUE_VENUE.mapsUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-brand-700 underline-offset-2 hover:underline"
-                                  title={LEAGUE_VENUE.address}
-                                >
-                                  {g.field}
-                                </a>
-                              </span>
+                              <a
+                                href={LEAGUE_VENUE.mapsUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-brand-700 underline-offset-2 hover:underline"
+                                title={LEAGUE_VENUE.address}
+                              >
+                                {firstGame.field}
+                              </a>
                               <span className="text-xs text-zinc-400">
-                                {formatMoney(g.pay_per_slot)}
+                                {formatMoney(firstGame.pay_per_slot)}/ump
                               </span>
+                              {isBundle && (
+                                <span className="inline-flex h-5 items-center rounded-full bg-brand-100 px-2 text-[10px] font-bold text-brand-800">
+                                  Bundle: {b.games.length} games
+                                </span>
+                              )}
                             </div>
-                            <div className="mt-1 truncate text-sm font-medium text-zinc-900">
-                              {g.team_home} vs {g.team_away}
-                            </div>
-                            {r.bundleSize > 1 && (
-                              <div className="mt-1 inline-flex h-5 items-center rounded-full bg-brand-100 px-2 text-[10px] font-bold text-brand-800">
-                                Bundle: {r.bundleSize} games
-                              </div>
-                            )}
+                            <ul className="mt-1.5 space-y-0.5">
+                              {b.games.map((g) => (
+                                <li
+                                  key={g.id}
+                                  className="text-sm text-zinc-900"
+                                >
+                                  <span className="inline-block w-16 font-mono text-xs text-zinc-500">
+                                    {formatGameTime(g.starts_at)}
+                                  </span>
+                                  <span className="font-medium">
+                                    {g.team_home}
+                                  </span>{" "}
+                                  <span className="text-zinc-600">
+                                    vs {g.team_away}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
                             <div className="mt-2 flex items-center gap-2.5 text-sm">
                               {r.umpire?.avatar_url ? (
                                 // eslint-disable-next-line @next/next/no-img-element
