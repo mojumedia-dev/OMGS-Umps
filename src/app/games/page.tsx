@@ -78,6 +78,26 @@ export default async function GamesPage({
     if (user && a.umpire_id === user.id) myAssignmentByGame.set(a.game_id, a);
   }
 
+  // Compute the set of game IDs that conflict with my existing active assignments
+  const myBusyWindows: { starts_at: string; ends_at: string }[] = [];
+  if (user) {
+    for (const a of assignments) {
+      if (a.umpire_id !== user.id) continue;
+      const g = games.find((g) => g.id === a.game_id);
+      if (g) myBusyWindows.push({ starts_at: g.starts_at, ends_at: g.ends_at });
+    }
+  }
+  const conflictGameIds = new Set<string>();
+  if (user) {
+    for (const g of games) {
+      if (myAssignmentByGame.has(g.id)) continue; // it's one of mine — not a conflict
+      const hits = myBusyWindows.some(
+        (w) => g.starts_at < w.ends_at && g.ends_at > w.starts_at
+      );
+      if (hits) conflictGameIds.add(g.id);
+    }
+  }
+
   const grouped = new Map<string, Game[]>();
   for (const g of games) {
     const key = formatGameDateKey(g.starts_at);
@@ -244,6 +264,7 @@ export default async function GamesPage({
                             game={g}
                             mine={mine}
                             remaining={remaining}
+                            conflicts={conflictGameIds.has(g.id)}
                           />
                         </div>
                       </div>
@@ -475,11 +496,13 @@ function GameAction({
   game,
   mine,
   remaining,
+  conflicts,
 }: {
   user: { id: string; eligible_divisions?: string[] } | null;
   game: Game;
   mine: { id: string; status: Assignment["status"] } | undefined;
   remaining: number;
+  conflicts: boolean;
 }) {
   if (!user) {
     return (
@@ -540,6 +563,17 @@ function GameAction({
       >
         Not eligible
       </Link>
+    );
+  }
+
+  if (conflicts) {
+    return (
+      <span
+        className="inline-flex h-9 items-center justify-center rounded-md bg-amber-50 px-3 text-xs font-medium text-amber-800"
+        title="You're already on another game at this time"
+      >
+        Conflicts
+      </span>
     );
   }
 

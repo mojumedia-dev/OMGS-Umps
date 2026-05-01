@@ -17,7 +17,7 @@ export async function requestGame(formData: FormData): Promise<void> {
 
   const { data: game } = await sb
     .from("games")
-    .select("id, ump_slots, status, division_code")
+    .select("id, ump_slots, status, division_code, starts_at, ends_at")
     .eq("id", gameId)
     .single();
   if (!game) throw new Error("Game not found");
@@ -27,6 +27,22 @@ export async function requestGame(formData: FormData): Promise<void> {
     throw new Error(
       `You're not eligible for ${game.division_code}. Update your profile to add it.`
     );
+  }
+
+  // Time-conflict guard: ump can't double-book themselves
+  const { data: myActive } = await sb
+    .from("assignments")
+    .select("id, game:games(starts_at, ends_at)")
+    .eq("umpire_id", user.id)
+    .in("status", ["requested", "approved", "confirmed"]);
+  type ActiveRow = { id: string; game: { starts_at: string; ends_at: string } | null };
+  for (const a of (myActive ?? []) as unknown as ActiveRow[]) {
+    if (!a.game) continue;
+    const conflicts =
+      game.starts_at < a.game.ends_at && game.ends_at > a.game.starts_at;
+    if (conflicts) {
+      throw new Error("That overlaps another game you're already on");
+    }
   }
 
   const { data: created, error } = await sb
