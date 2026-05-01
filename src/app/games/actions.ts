@@ -7,6 +7,33 @@ import { refreshGameStatus } from "@/lib/db/game-status";
 import { logAudit } from "@/lib/audit/log";
 import { loadSlotGames } from "@/lib/db/slots";
 
+async function tryRequestGameId(
+  sb: ReturnType<typeof supabaseServer>,
+  user: { id: string; eligible_divisions: string[] | null },
+  activeRows: { id: string; game: { starts_at: string; ends_at: string } | null }[],
+  gameId: string
+): Promise<string | null> {
+  const { data: g } = await sb
+    .from("games")
+    .select("id, status, division_code, starts_at, ends_at")
+    .eq("id", gameId)
+    .single();
+  if (!g) return null;
+  if (g.status === "filled" || g.status === "cancelled") return null;
+  if (!user.eligible_divisions?.includes(g.division_code)) return null;
+  for (const a of activeRows) {
+    if (!a.game) continue;
+    if (g.starts_at < a.game.ends_at && g.ends_at > a.game.starts_at) return null;
+  }
+  const { data: created, error } = await sb
+    .from("assignments")
+    .insert({ game_id: gameId, umpire_id: user.id, status: "requested" })
+    .select("id")
+    .maybeSingle();
+  if (error && error.code !== "23505") return null;
+  return created?.id ?? null;
+}
+
 export async function requestGame(formData: FormData): Promise<void> {
   const gameId = String(formData.get("gameId") ?? "");
   if (!gameId) throw new Error("Missing gameId");
@@ -74,6 +101,54 @@ export async function requestGame(formData: FormData): Promise<void> {
       assignmentId: a.id,
       details: slot.length > 1 ? { bundle_size: slot.length } : undefined,
     });
+  }
+
+  revalidatePath("/games");
+  revalidatePath("/dashboard");
+}
+
+/**
+ * Weekend opt-in: ump requests the primary game plus any same-day+field+division
+ * "extras" they checked in the popup. Skips invalid extras silently rather than
+ * failing the whole transaction (best-effort multi-insert).
+ */
+export async function requestGameWithExtras(formData: FormData): Promise<void> {
+  const gameId = String(formData.get("gameId") ?? "");
+  if (!gameId) throw new Error("Missing gameId");
+  const extras = formData.getAll("extra").map(String).filter(Boolean);
+
+  const user = await ensureCurrentUserRow();
+  if (!user) throw new Error("Not signed in");
+
+  const sb = supabaseServer();
+
+  // Reuse the existing flow for the primary game (does its own bundle if weekday)
+  const fakeForm = new FormData();
+  fakeForm.set("gameId", gameId);
+  await requestGame(fakeForm);
+
+  // Best-effort: request each extra
+  const { data: myActive } = await sb
+    .from("assignments")
+    .select("id, game:games(starts_at, ends_at)")
+    .eq("umpire_id", user.id)
+    .in("status", ["requested", "approved", "confirmed"]);
+  type ActiveRow = { id: string; game: { starts_at: string; ends_at: string } | null };
+  const activeRows = (myActive ?? []) as unknown as ActiveRow[];
+
+  for (const extraId of extras) {
+    if (extraId === gameId) continue;
+    const created = await tryRequestGameId(sb, user, activeRows, extraId);
+    if (created) {
+      await logAudit({
+        action: "request",
+        actorId: user.id,
+        subjectId: user.id,
+        gameId: extraId,
+        assignmentId: created,
+        details: { weekend_extra: true },
+      });
+    }
   }
 
   revalidatePath("/games");

@@ -12,7 +12,7 @@ import {
   nowAsLeagueIso,
 } from "@/lib/format";
 import type { Game, Assignment } from "@/lib/db/types";
-import { requestGame, cancelMyRequest } from "./actions";
+import { requestGame, cancelMyRequest, requestGameWithExtras } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +23,13 @@ const ACTIVE_STATUSES: Assignment["status"][] = [
   "completed",
   "paid",
 ];
+
+type AssignmentRowLite = Pick<
+  Assignment,
+  "id" | "game_id" | "umpire_id" | "status"
+> & {
+  umpire: { full_name: string; avatar_url: string | null } | null;
+};
 
 export default async function GamesPage({
   searchParams,
@@ -75,13 +82,10 @@ export default async function GamesPage({
   }
 
   const games = (gamesData ?? []) as Game[];
-  type AssignmentRow = Pick<Assignment, "id" | "game_id" | "umpire_id" | "status"> & {
-    umpire: { full_name: string; avatar_url: string | null } | null;
-  };
-  const assignments = (allActive ?? []) as unknown as AssignmentRow[];
+  const assignments = (allActive ?? []) as unknown as AssignmentRowLite[];
 
-  const assignmentsByGame = new Map<string, AssignmentRow[]>();
-  const myAssignmentByGame = new Map<string, AssignmentRow>();
+  const assignmentsByGame = new Map<string, AssignmentRowLite[]>();
+  const myAssignmentByGame = new Map<string, AssignmentRowLite>();
   for (const a of assignments) {
     if (!assignmentsByGame.has(a.game_id)) assignmentsByGame.set(a.game_id, []);
     assignmentsByGame.get(a.game_id)!.push(a);
@@ -221,6 +225,18 @@ export default async function GamesPage({
                   const filled = gameAssignments.length;
                   const remaining = g.ump_slots - filled;
                   const mine = myAssignmentByGame.get(g.id);
+                  const isWeekend = (() => {
+                    const dow = new Date(g.starts_at).getUTCDay();
+                    return dow === 0 || dow === 6;
+                  })();
+                  const siblings = isWeekend
+                    ? dayGames.filter(
+                        (x) =>
+                          x.id !== g.id &&
+                          x.field === g.field &&
+                          x.division_code === g.division_code
+                      )
+                    : [];
                   return (
                     <li key={g.id} className="px-4 py-3">
                       <div className="flex items-start justify-between gap-3">
@@ -289,6 +305,9 @@ export default async function GamesPage({
                             mine={mine}
                             remaining={remaining}
                             conflicts={conflictGameIds.has(g.id)}
+                            weekendSiblings={siblings}
+                            myAssignmentByGame={myAssignmentByGame}
+                            assignmentsByGame={assignmentsByGame}
                           />
                         </div>
                       </div>
@@ -521,12 +540,18 @@ function GameAction({
   mine,
   remaining,
   conflicts,
+  weekendSiblings,
+  myAssignmentByGame,
+  assignmentsByGame,
 }: {
   user: { id: string; eligible_divisions?: string[] } | null;
   game: Game;
   mine: { id: string; status: Assignment["status"] } | undefined;
   remaining: number;
   conflicts: boolean;
+  weekendSiblings: Game[];
+  myAssignmentByGame: Map<string, AssignmentRowLite>;
+  assignmentsByGame: Map<string, AssignmentRowLite[]>;
 }) {
   if (!user) {
     return (
@@ -598,6 +623,70 @@ function GameAction({
       >
         Conflicts
       </span>
+    );
+  }
+
+  // Weekend with siblings → inline opt-in popup
+  if (weekendSiblings.length > 0) {
+    return (
+      <details className="text-xs">
+        <summary className="cursor-pointer rounded-md bg-brand-600 px-3 py-2 text-center text-xs font-bold text-white transition-colors hover:bg-brand-700">
+          Request…
+        </summary>
+        <form
+          action={requestGameWithExtras}
+          className="mt-2 w-56 rounded-md border border-zinc-200 bg-white p-3 text-left shadow-md"
+        >
+          <input type="hidden" name="gameId" value={game.id} />
+          <p className="text-[11px] font-semibold text-zinc-700">
+            You'll request this game.
+          </p>
+          <p className="mt-2 text-[11px] font-semibold text-zinc-700">
+            Take any of these too?
+          </p>
+          <ul className="mt-1 space-y-1.5">
+            {weekendSiblings.map((s) => {
+              const t = new Date(s.starts_at).toLocaleTimeString("en-US", {
+                hour: "numeric",
+                minute: "2-digit",
+                hour12: true,
+                timeZone: "UTC",
+              });
+              const filled = (assignmentsByGame.get(s.id)?.length ?? 0);
+              const isMine = !!myAssignmentByGame.get(s.id);
+              const isFull = filled >= s.ump_slots;
+              const disabled = isMine || isFull;
+              return (
+                <li key={s.id}>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      name="extra"
+                      value={s.id}
+                      disabled={disabled}
+                      className="h-3.5 w-3.5 accent-brand-600"
+                    />
+                    <span
+                      className={`text-[11px] ${
+                        disabled ? "text-zinc-400" : "text-zinc-800"
+                      }`}
+                    >
+                      {t}
+                      {isMine ? " (yours)" : isFull ? " (full)" : ""}
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+          <button
+            type="submit"
+            className="mt-3 inline-flex h-8 w-full items-center justify-center rounded-md bg-brand-600 px-3 text-xs font-bold text-white hover:bg-brand-700"
+          >
+            Send request
+          </button>
+        </form>
+      </details>
     );
   }
 

@@ -40,16 +40,26 @@ export function slotKey(g: Pick<SlotGame, "starts_at" | "field" | "division_code
  */
 export async function loadSlotGames(game: SlotGame): Promise<SlotGame[]> {
   if (!isWeekday(game.starts_at)) return [game];
+  return loadSameDayFieldDivision(game);
+}
+
+/**
+ * Always return same-date+field+division games, regardless of weekday/weekend.
+ * Used by the weekend opt-in picker.
+ */
+export async function loadSameDayFieldDivision(
+  game: SlotGame
+): Promise<SlotGame[]> {
   const win = dayWindow(game.starts_at);
   const sb = supabaseServer();
   const { data, error } = await sb
     .from("games")
-    .select("id, starts_at, ends_at, division_code, field")
+    .select("id, starts_at, ends_at, division_code, field, team_home, team_away")
     .eq("field", game.field)
     .eq("division_code", game.division_code)
     .gte("starts_at", win.from)
     .lt("starts_at", win.to)
     .order("starts_at", { ascending: true });
   if (error || !data || data.length === 0) return [game];
-  return data as SlotGame[];
+  return data as unknown as SlotGame[];
 }
