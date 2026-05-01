@@ -99,11 +99,11 @@ export default async function GamesPage({
   }
   // Allowed divisions for chip rendering = scope ⋂ eligible (or just scope/eligible/all)
   const allowedDivisions = (() => {
-    const all: string[] = ["8U", "10U", "12U", "14U", "16U", "18U"];
-    let result = all;
-    if (effectiveScope) result = result.filter((d) => effectiveScope.includes(d));
+    let result: string[] = ["8U", "10U", "12U", "14U", "16U", "18U"];
+    if (effectiveScope)
+      result = result.filter((d) => (effectiveScope as string[]).includes(d));
     if (eligibleFilter)
-      result = result.filter((d) => eligibleFilter.includes(d));
+      result = result.filter((d) => (eligibleFilter as string[]).includes(d));
     return result;
   })();
   const [{ data: gamesData, error: gamesErr }, { data: allActive, error: assnErr }] = await Promise.all([
