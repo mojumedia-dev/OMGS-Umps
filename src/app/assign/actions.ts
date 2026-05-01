@@ -68,12 +68,24 @@ export async function assignUmpToGame(formData: FormData): Promise<void> {
     }
   }
 
+  // Placeholder umps (seeded for testing) auto-accept since no real user can log in
+  const { data: target } = await sb
+    .from("users")
+    .select("clerk_user_id")
+    .eq("id", umpireId)
+    .maybeSingle();
+  const isPlaceholder =
+    target?.clerk_user_id?.startsWith("placeholder_") ?? false;
+  const status = isPlaceholder ? "confirmed" : "assigned";
+  const nowIso = new Date().toISOString();
+
   const inserts = slot.map((sg) => ({
     game_id: sg.id,
     umpire_id: umpireId,
-    status: "assigned" as const,
+    status: status as "assigned" | "confirmed",
     approved_by: board.id,
-    approved_at: new Date().toISOString(),
+    approved_at: nowIso,
+    confirmed_at: isPlaceholder ? nowIso : null,
   }));
   const { data: created, error } = await sb
     .from("assignments")
@@ -81,21 +93,28 @@ export async function assignUmpToGame(formData: FormData): Promise<void> {
     .select("id, game_id");
   if (error) throw error;
 
-  await sendPushToUser(umpireId, {
-    title: `New assignment from ${board.full_name}`,
-    body: formatGameSummary(game),
-    url: "/dashboard",
-    tag: `assigned-${gameId}`,
-  });
+  if (!isPlaceholder) {
+    await sendPushToUser(umpireId, {
+      title: `New assignment from ${board.full_name}`,
+      body: formatGameSummary(game),
+      url: "/dashboard",
+      tag: `assigned-${gameId}`,
+    });
+  }
 
   for (const a of created ?? []) {
+    await refreshGameStatus(a.game_id);
     await logAudit({
       action: "approve",
       actorId: board.id,
       subjectId: umpireId,
       gameId: a.game_id,
       assignmentId: a.id,
-      details: { board_assigned: true, bundle_size: slot.length },
+      details: {
+        board_assigned: true,
+        bundle_size: slot.length,
+        auto_accepted: isPlaceholder,
+      },
     });
   }
 
