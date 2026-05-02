@@ -353,6 +353,78 @@ export async function transferAssignment(formData: FormData): Promise<void> {
   revalidatePath("/games");
 }
 
+export async function cancelAssignmentAsUic(formData: FormData): Promise<void> {
+  const assignmentId = String(formData.get("assignmentId") ?? "");
+  const scope = String(formData.get("scope") ?? "single");
+  if (!assignmentId) throw new Error("Missing assignmentId");
+
+  const uic = await requireUic();
+  const sb = supabaseServer();
+
+  const { data: orig } = await sb
+    .from("assignments")
+    .select(
+      "id, umpire_id, game_id, status, game:games(id, starts_at, ends_at, division_code, team_home, team_away, field)"
+    )
+    .eq("id", assignmentId)
+    .in("status", ["requested", "assigned", "approved", "confirmed"])
+    .maybeSingle();
+  if (!orig?.game) throw new Error("Assignment not found");
+
+  const g = orig.game as unknown as {
+    id: string;
+    starts_at: string;
+    ends_at: string;
+    division_code: string;
+    team_home: string;
+    team_away: string;
+    field: string;
+  };
+  const fullSlot = await loadSlotGames(g);
+  const targetIds =
+    scope === "bundle" ? fullSlot.map((sg) => sg.id) : [g.id];
+
+  const { data: cancelled, error } = await sb
+    .from("assignments")
+    .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+    .eq("umpire_id", orig.umpire_id)
+    .in("status", ["requested", "assigned", "approved", "confirmed"])
+    .in("game_id", targetIds)
+    .select("id, game_id");
+  if (error) throw error;
+
+  for (const a of cancelled ?? []) await refreshGameStatus(a.game_id);
+
+  if (orig.umpire_id) {
+    await sendPushToUser(orig.umpire_id, {
+      title:
+        (cancelled?.length ?? 0) > 1
+          ? `${cancelled?.length} games cancelled`
+          : "Game cancelled",
+      body: formatGameSummary(g),
+      url: "/dashboard",
+      tag: `uic-cancel-${g.id}`,
+    });
+    await logAudit({
+      action: "cancel",
+      actorId: uic.id,
+      subjectId: orig.umpire_id,
+      gameId: g.id,
+      assignmentId,
+      details: {
+        by_uic: true,
+        bundle_size: cancelled?.length ?? 0,
+        scope,
+      },
+    });
+  }
+
+  revalidatePath("/uic");
+  revalidatePath("/uic/games");
+  revalidatePath("/games");
+  revalidatePath("/dashboard");
+}
+
 export async function toggleTournament(formData: FormData): Promise<void> {
   const gameId = String(formData.get("gameId") ?? "");
   if (!gameId) throw new Error("Missing gameId");

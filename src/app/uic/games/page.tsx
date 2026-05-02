@@ -11,7 +11,7 @@ import {
 } from "@/lib/format";
 import { LEAGUE_VENUE } from "@/lib/league";
 import type { Game, AssignmentStatus, DivisionCode } from "@/lib/db/types";
-import { transferAssignment } from "../actions";
+import { transferAssignment, cancelAssignmentAsUic } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -311,8 +311,30 @@ export default async function ManageGamesPage({
                                 {a.status}
                               </span>
                               <form
+                                action={cancelAssignmentAsUic}
+                                className="ml-auto"
+                              >
+                                <input
+                                  type="hidden"
+                                  name="assignmentId"
+                                  value={a.id}
+                                />
+                                <input
+                                  type="hidden"
+                                  name="scope"
+                                  value="single"
+                                />
+                                <button
+                                  type="submit"
+                                  className="text-[11px] text-zinc-500 underline-offset-2 hover:text-red-700 hover:underline"
+                                  title="Cancel just this game"
+                                >
+                                  Cancel
+                                </button>
+                              </form>
+                              <form
                                 action={transferAssignment}
-                                className="ml-auto flex flex-wrap items-center gap-1"
+                                className="flex flex-wrap items-center gap-1"
                               >
                                 <input
                                   type="hidden"
