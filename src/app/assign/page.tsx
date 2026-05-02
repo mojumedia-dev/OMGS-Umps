@@ -95,12 +95,29 @@ export default async function AssignPage() {
       u.role !== "board" /* don't pick board members as umps */
   );
 
-  // Group games by date for display
-  const grouped = new Map<string, Game[]>();
+  // Group by SLOT (date + field + division) so each weekday slot is one card.
+  // Weekend games stay singleton slots.
+  type SlotEntry = { key: string; games: Game[]; dateKey: string };
+  const slotMap = new Map<string, SlotEntry>();
   for (const g of games) {
-    const key = formatGameDateKey(g.starts_at);
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key)!.push(g);
+    const dateKey = formatGameDateKey(g.starts_at);
+    const slotKey = `${dateKey}_${g.field}_${g.division_code}`;
+    if (!slotMap.has(slotKey)) {
+      slotMap.set(slotKey, { key: slotKey, games: [], dateKey });
+    }
+    slotMap.get(slotKey)!.games.push(g);
+  }
+  for (const s of slotMap.values()) {
+    s.games.sort((a, b) => (a.starts_at < b.starts_at ? -1 : 1));
+  }
+  const slots = [...slotMap.values()].sort((a, b) =>
+    a.games[0].starts_at < b.games[0].starts_at ? -1 : 1
+  );
+
+  const grouped = new Map<string, SlotEntry[]>();
+  for (const s of slots) {
+    if (!grouped.has(s.dateKey)) grouped.set(s.dateKey, []);
+    grouped.get(s.dateKey)!.push(s);
   }
 
   return (
@@ -122,113 +139,140 @@ export default async function AssignPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            {[...grouped.entries()].map(([dateKey, dayGames]) => (
+            {[...grouped.entries()].map(([dateKey, daySlots]) => (
               <section key={dateKey}>
                 <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                  {formatGameDate(dayGames[0].starts_at)}
+                  {formatGameDate(daySlots[0].games[0].starts_at)}
                 </h2>
-                <ul className="divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white">
-                  {dayGames.map((g) => {
-                    const assigned = assignmentsByGame.get(g.id) ?? [];
-                    const filled = assigned.length;
-                    const remaining = g.ump_slots - filled;
+                <ul className="space-y-2">
+                  {daySlots.map((slot) => {
+                    const firstGame = slot.games[0];
+                    const allAssignmentsInSlot = slot.games.flatMap(
+                      (g) => assignmentsByGame.get(g.id) ?? []
+                    );
+                    // Per-slot we expect each game to have ump_slots umps assigned;
+                    // show the union of unique umps assigned across games in slot.
+                    const umpsInSlot = Array.from(
+                      new Map(
+                        allAssignmentsInSlot
+                          .filter((a) => a.umpire)
+                          .map((a) => [a.umpire!.id, a])
+                      ).values()
+                    );
+                    const slotsRemaining = firstGame.ump_slots - umpsInSlot.length;
+                    const isBundle = slot.games.length > 1;
                     return (
-                      <li key={g.id} className="px-4 py-3">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="inline-flex h-5 items-center rounded bg-brand-600 px-1.5 text-[11px] font-bold text-white">
-                                {g.division_code}
-                              </span>
-                              <span className="text-sm text-zinc-500">
-                                {formatGameTime(g.starts_at)} ·{" "}
-                                <a
-                                  href={LEAGUE_VENUE.mapsUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-brand-700 underline-offset-2 hover:underline"
-                                >
-                                  {g.field}
-                                </a>
-                              </span>
-                              <span className="text-xs text-zinc-400">
-                                {formatMoney(g.pay_per_slot)} × {g.ump_slots}
-                              </span>
-                            </div>
-                            <div className="mt-1 truncate text-sm font-medium text-zinc-900">
-                              {g.team_home} vs {g.team_away}
-                            </div>
-                            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                              {assigned.map((a) => {
-                                const tone =
-                                  a.status === "assigned"
-                                    ? "border-amber-300 bg-amber-50 text-amber-900"
-                                    : "border-brand-200 bg-lime-100 text-brand-900";
-                                return (
-                                  <span
-                                    key={a.id}
-                                    className={`inline-flex h-6 items-center gap-1.5 rounded-full border px-2 text-[11px] font-semibold ${tone}`}
-                                    title={`${a.umpire?.full_name} · ${a.status}`}
-                                  >
-                                    {a.umpire?.avatar_url ? (
-                                      // eslint-disable-next-line @next/next/no-img-element
-                                      <img
-                                        src={a.umpire.avatar_url}
-                                        alt=""
-                                        className="h-4 w-4 rounded-full object-cover"
-                                      />
-                                    ) : (
-                                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-brand-200 text-[8px] font-bold text-brand-800">
-                                        {(a.umpire?.full_name ?? "U").charAt(0).toUpperCase()}
-                                      </span>
-                                    )}
-                                    {a.umpire?.full_name?.split(" ")[0] ?? "?"}{" "}
-                                    {a.status === "assigned" ? "(pending)" : ""}
-                                  </span>
-                                );
-                              })}
-                              {Array.from({ length: Math.max(0, remaining) }).map(
-                                (_, i) => (
-                                  <span
-                                    key={`open-${i}`}
-                                    className="inline-flex h-6 items-center rounded-full border border-dashed border-zinc-300 px-2 text-[11px] font-medium text-zinc-500"
-                                  >
-                                    Open
-                                  </span>
-                                )
-                              )}
-                            </div>
-                          </div>
-                          {remaining > 0 && (
-                            <form
-                              action={assignUmpToGame}
-                              className="flex shrink-0 items-center gap-1"
-                            >
-                              <input type="hidden" name="gameId" value={g.id} />
-                              <select
-                                name="umpireId"
-                                required
-                                defaultValue=""
-                                className="h-9 w-44 rounded-md border border-zinc-300 bg-white px-2 text-xs"
-                              >
-                                <option value="" disabled>
-                                  Pick ump
-                                </option>
-                                {roster.map((u) => (
-                                  <option key={u.id} value={u.id}>
-                                    {u.full_name}
-                                  </option>
-                                ))}
-                              </select>
-                              <button
-                                type="submit"
-                                className="inline-flex h-9 items-center justify-center rounded-md bg-brand-600 px-3 text-xs font-bold text-white hover:bg-brand-700"
-                              >
-                                Assign
-                              </button>
-                            </form>
+                      <li
+                        key={slot.key}
+                        className="rounded-lg border border-zinc-200 bg-white p-4"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex h-5 items-center rounded bg-brand-600 px-1.5 text-[11px] font-bold text-white">
+                            {firstGame.division_code}
+                          </span>
+                          <a
+                            href={LEAGUE_VENUE.mapsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-semibold text-brand-700 underline-offset-2 hover:underline"
+                          >
+                            {firstGame.field}
+                          </a>
+                          <span className="text-xs text-zinc-500">
+                            {formatMoney(firstGame.pay_per_slot)} × {firstGame.ump_slots}
+                          </span>
+                          {isBundle && (
+                            <span className="ml-auto inline-flex h-5 items-center rounded-full bg-brand-100 px-2 text-[10px] font-bold text-brand-800">
+                              Bundle: {slot.games.length} games
+                            </span>
                           )}
                         </div>
+                        <ul className="mt-2 space-y-0.5 text-sm">
+                          {slot.games.map((g) => (
+                            <li key={g.id} className="flex gap-2">
+                              <span className="w-16 shrink-0 font-mono text-xs text-zinc-500">
+                                {formatGameTime(g.starts_at)}
+                              </span>
+                              <span className="truncate">
+                                <span className="font-medium">{g.team_home}</span>{" "}
+                                <span className="text-zinc-600">vs {g.team_away}</span>
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                          {umpsInSlot.map((a) => {
+                            const tone =
+                              a.status === "assigned"
+                                ? "border-amber-300 bg-amber-50 text-amber-900"
+                                : "border-brand-200 bg-lime-100 text-brand-900";
+                            return (
+                              <span
+                                key={a.id}
+                                className={`inline-flex h-6 items-center gap-1.5 rounded-full border px-2 text-[11px] font-semibold ${tone}`}
+                                title={`${a.umpire?.full_name} · ${a.status}`}
+                              >
+                                {a.umpire?.avatar_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={a.umpire.avatar_url}
+                                    alt=""
+                                    className="h-4 w-4 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-brand-200 text-[8px] font-bold text-brand-800">
+                                    {(a.umpire?.full_name ?? "U").charAt(0).toUpperCase()}
+                                  </span>
+                                )}
+                                {a.umpire?.full_name?.split(" ")[0] ?? "?"}
+                                {a.status === "assigned" ? " (pending)" : ""}
+                              </span>
+                            );
+                          })}
+                          {Array.from({ length: Math.max(0, slotsRemaining) }).map(
+                            (_, i) => (
+                              <span
+                                key={`open-${i}`}
+                                className="inline-flex h-6 items-center rounded-full border border-dashed border-zinc-300 px-2 text-[11px] font-medium text-zinc-500"
+                              >
+                                Open
+                              </span>
+                            )
+                          )}
+                        </div>
+                        {slotsRemaining > 0 && (
+                          <form
+                            action={assignUmpToGame}
+                            className="mt-3 flex flex-wrap items-center gap-2"
+                          >
+                            <input
+                              type="hidden"
+                              name="gameId"
+                              value={firstGame.id}
+                            />
+                            <select
+                              name="umpireId"
+                              required
+                              defaultValue=""
+                              className="h-9 flex-1 min-w-40 rounded-md border border-zinc-300 bg-white px-2 text-sm"
+                            >
+                              <option value="" disabled>
+                                Pick ump
+                              </option>
+                              {roster.map((u) => (
+                                <option key={u.id} value={u.id}>
+                                  {u.full_name}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="submit"
+                              className="inline-flex h-9 items-center justify-center rounded-md bg-brand-600 px-4 text-sm font-bold text-white hover:bg-brand-700"
+                            >
+                              Assign{isBundle ? " all" : ""}
+                            </button>
+                          </form>
+                        )}
                       </li>
                     );
                   })}
