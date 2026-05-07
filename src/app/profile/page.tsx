@@ -109,6 +109,30 @@ export default async function ProfilePage() {
                 className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-200"
               />
             </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-zinc-700">
+                Venmo handle{" "}
+                <span className="font-normal text-zinc-400">
+                  (so the league can pay you)
+                </span>
+              </span>
+              <div className="relative mt-1">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">
+                  @
+                </span>
+                <input
+                  type="text"
+                  name="venmo_handle"
+                  inputMode="text"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder="your-handle"
+                  defaultValue={user.venmo_handle ?? ""}
+                  className="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 pl-7 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                />
+              </div>
+            </label>
             <div className="flex items-center justify-between text-xs text-zinc-500">
               <span>Email: {user.email ?? "—"}</span>
               <span className="uppercase">Role: {user.role}</span>
@@ -121,6 +145,12 @@ export default async function ProfilePage() {
             Save contact
           </button>
         </form>
+
+        {!user.venmo_handle && (
+          <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            Add your Venmo handle so the league can pay you in one tap. Without it, payouts have to be looked up manually.
+          </div>
+        )}
 
         {!user.phone && (
           <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">

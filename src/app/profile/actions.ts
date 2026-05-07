@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { ensureCurrentUserRow } from "@/lib/users";
 import { supabaseServer } from "@/lib/supabase/server";
+import { normalizeVenmoHandle } from "@/lib/venmo";
 import type { DivisionCode } from "@/lib/db/types";
 
 const ALL_DIVISIONS: DivisionCode[] = ["8U", "10U", "12U", "14U", "16U", "18U"];
@@ -80,6 +81,7 @@ export async function updateContact(formData: FormData): Promise<void> {
 
   const phoneRaw = String(formData.get("phone") ?? "").trim();
   const fullName = String(formData.get("full_name") ?? "").trim();
+  const venmoRaw = String(formData.get("venmo_handle") ?? "").trim();
 
   let phone: string | null = null;
   if (phoneRaw) {
@@ -87,13 +89,26 @@ export async function updateContact(formData: FormData): Promise<void> {
     if (!phone) throw new Error("Phone must be a 10-digit US number");
   }
 
-  const updates: { full_name?: string; phone?: string | null } = {};
+  let venmo: string | null = null;
+  if (venmoRaw) {
+    venmo = normalizeVenmoHandle(venmoRaw);
+    if (!venmo)
+      throw new Error("Venmo handle must be 4-30 letters, digits, _ . or -");
+  }
+
+  const updates: {
+    full_name?: string;
+    phone?: string | null;
+    venmo_handle?: string | null;
+  } = {};
   if (fullName) updates.full_name = fullName;
   updates.phone = phone;
+  updates.venmo_handle = venmo;
 
   const sb = supabaseServer();
   const { error } = await sb.from("users").update(updates).eq("id", user.id);
   if (error) throw error;
 
   revalidatePath("/profile");
+  revalidatePath("/uic/payouts");
 }

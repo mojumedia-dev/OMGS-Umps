@@ -223,6 +223,85 @@ export async function markPaid(formData: FormData): Promise<void> {
   revalidatePath("/dashboard");
 }
 
+/**
+ * Mark every still-unpaid eligible assignment for one umpire as paid in a
+ * single click — used after the UIC has sent one bundled Venmo payment to
+ * cover the whole batch. Each assignment is paid at its own pay_per_slot so
+ * the per-game ledger stays accurate.
+ */
+export async function markBundlePaid(formData: FormData): Promise<void> {
+  const umpireId = String(formData.get("umpireId") ?? "");
+  if (!umpireId) throw new Error("Missing umpireId");
+  const board = await requireBoard();
+
+  const sb = supabaseServer();
+  const nowIso = new Date().toISOString();
+
+  // Pull unpaid eligible assignments for this ump that have already started.
+  const { data: rows, error: selErr } = await sb
+    .from("assignments")
+    .select(
+      "id, game_id, game:games!inner(id, division_code, team_home, team_away, field, starts_at, pay_per_slot)"
+    )
+    .eq("umpire_id", umpireId)
+    .in("status", ["approved", "confirmed", "completed"])
+    .lte("game.starts_at", nowIso);
+  if (selErr) throw selErr;
+
+  type R = {
+    id: string;
+    game_id: string;
+    game: {
+      id: string;
+      division_code: string;
+      team_home: string;
+      team_away: string;
+      field: string;
+      starts_at: string;
+      pay_per_slot: number;
+    } | null;
+  };
+  const assignments = ((rows ?? []) as unknown as R[]).filter((r) => r.game);
+  if (assignments.length === 0) return;
+
+  let totalPaid = 0;
+  for (const a of assignments) {
+    const amount = a.game!.pay_per_slot;
+    const { error: upErr } = await sb
+      .from("assignments")
+      .update({
+        status: "paid",
+        paid_at: nowIso,
+        paid_amount: amount,
+        paid_by: board.id,
+      })
+      .eq("id", a.id)
+      .in("status", ["approved", "confirmed", "completed"]);
+    if (upErr) throw upErr;
+
+    totalPaid += amount;
+    await logAudit({
+      action: "pay",
+      actorId: board.id,
+      subjectId: umpireId,
+      gameId: a.game_id,
+      assignmentId: a.id,
+      details: { amount, bundle: true },
+    });
+  }
+
+  await sendPushToUser(umpireId, {
+    title: `Paid $${totalPaid.toFixed(0)} 💵`,
+    body: `${assignments.length} game${assignments.length === 1 ? "" : "s"} settled`,
+    url: "/dashboard",
+    tag: `paid-bundle-${umpireId}-${Date.now()}`,
+  });
+
+  revalidatePath("/uic");
+  revalidatePath("/uic/payouts");
+  revalidatePath("/dashboard");
+}
+
 export async function undoPaid(formData: FormData): Promise<void> {
   const assignmentId = String(formData.get("assignmentId") ?? "");
   if (!assignmentId) throw new Error("Missing assignmentId");

@@ -44,6 +44,7 @@ export interface User {
   full_name: string;
   email: string | null;
   phone: string | null;
+  venmo_handle: string | null;
   eligible_divisions: DivisionCode[];
   scope_divisions: DivisionCode[] | null;
   avatar_url: string | null;

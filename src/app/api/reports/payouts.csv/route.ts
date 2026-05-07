@@ -27,7 +27,7 @@ export async function GET(req: Request) {
     .select(
       `paid_at, paid_amount, status,
        game:games (division_code, team_home, team_away, field, starts_at, is_tournament),
-       umpire:users!assignments_umpire_id_fkey (full_name, email, phone)`
+       umpire:users!assignments_umpire_id_fkey (full_name, email, phone, venmo_handle)`
     )
     .in("status", ["approved", "confirmed", "completed", "paid"]);
 
@@ -49,7 +49,12 @@ export async function GET(req: Request) {
       starts_at: string;
       is_tournament: boolean;
     } | null;
-    umpire: { full_name: string; email: string | null; phone: string | null } | null;
+    umpire: {
+      full_name: string;
+      email: string | null;
+      phone: string | null;
+      venmo_handle: string | null;
+    } | null;
   };
   const rows = (data ?? []) as unknown as Row[];
 
@@ -63,6 +68,7 @@ export async function GET(req: Request) {
     "umpire",
     "phone",
     "email",
+    "venmo",
     "amount",
     "status",
     "paid_at",
@@ -85,6 +91,7 @@ export async function GET(req: Request) {
         csvEscape(r.umpire?.full_name ?? ""),
         csvEscape(r.umpire?.phone ?? ""),
         csvEscape(r.umpire?.email ?? ""),
+        csvEscape(r.umpire?.venmo_handle ?? ""),
         csvEscape(r.paid_amount ?? ""),
         csvEscape(r.status),
         csvEscape(r.paid_at ?? ""),
