@@ -6,6 +6,11 @@ export const LEAGUE_VENUE = {
   mapsUrl: "https://maps.app.goo.gl/sqhTuxaCPACSg3v67",
 };
 
+export const LEAGUE_VENMO = {
+  handle: "omgsleague",
+  profileUrl: "https://venmo.com/u/omgsleague",
+};
+
 export function venueLabel(field: string): string {
   return `${field} · ${LEAGUE_VENUE.address}`;
 }

@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ensureCurrentUserRow } from "@/lib/users";
 import { updateEligibility, updateContact, updateAvatar } from "./actions";
 import PushToggle from "./push-toggle";
+import { LEAGUE_VENMO } from "@/lib/league";
 import type { DivisionCode } from "@/lib/db/types";
 
 export const dynamic = "force-dynamic";
@@ -132,6 +132,18 @@ export default async function ProfilePage() {
                   className="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 pl-7 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-200"
                 />
               </div>
+              <p className="mt-1 text-xs text-zinc-500">
+                Payouts come from{" "}
+                <a
+                  href={LEAGUE_VENMO.profileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-[#3D95CE] underline-offset-2 hover:underline"
+                >
+                  @{LEAGUE_VENMO.handle}
+                </a>
+                .
+              </p>
             </label>
             <div className="flex items-center justify-between text-xs text-zinc-500">
               <span>Email: {user.email ?? "—"}</span>

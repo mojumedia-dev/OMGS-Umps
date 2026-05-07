@@ -10,7 +10,7 @@ import {
 } from "@/lib/format";
 import type { Game, User } from "@/lib/db/types";
 import { markPaid, undoPaid, markBundlePaid } from "../actions";
-import { LEAGUE_VENUE } from "@/lib/league";
+import { LEAGUE_VENUE, LEAGUE_VENMO } from "@/lib/league";
 import { buildVenmoPayUrl } from "@/lib/venmo";
 
 export const dynamic = "force-dynamic";
@@ -126,6 +126,19 @@ export default async function PayoutsPage() {
           >
             CSV ↓
           </a>
+        </div>
+
+        <div className="mb-6 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
+          Paying from{" "}
+          <a
+            href={LEAGUE_VENMO.profileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-bold text-[#3D95CE] underline-offset-2 hover:underline"
+          >
+            @{LEAGUE_VENMO.handle}
+          </a>
+          . Make sure you&apos;re signed into that account in Venmo before tapping a Pay button.
         </div>
 
         {unpaidUmps.length === 0 && paid.length === 0 ? (
