@@ -166,24 +166,24 @@ export default async function AssignPage() {
                         key={slot.key}
                         className="rounded-lg border border-zinc-200 bg-white p-4"
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex h-5 items-center rounded bg-brand-600 px-1.5 text-[11px] font-bold text-white">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="inline-flex h-5 items-center rounded bg-brand-600 px-1.5 text-[11px] font-bold text-white whitespace-nowrap">
                             {firstGame.division_code}
                           </span>
                           <a
                             href={LEAGUE_VENUE.mapsUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-sm font-semibold text-brand-700 underline-offset-2 hover:underline"
+                            className="text-sm font-semibold text-brand-700 underline-offset-2 hover:underline whitespace-nowrap"
                           >
                             {firstGame.field}
                           </a>
-                          <span className="text-xs text-zinc-500">
+                          <span className="text-xs text-zinc-500 whitespace-nowrap">
                             {formatMoney(firstGame.pay_per_slot)} × {firstGame.ump_slots}
                           </span>
                           {isBundle && (
-                            <span className="ml-auto inline-flex h-5 items-center rounded-full bg-brand-100 px-2 text-[10px] font-bold text-brand-800">
-                              Bundle: {slot.games.length} games
+                            <span className="ml-auto inline-flex h-5 items-center rounded-full bg-brand-100 px-2 text-[10px] font-bold text-brand-800 whitespace-nowrap">
+                              Bundle · {slot.games.length}
                             </span>
                           )}
                         </div>

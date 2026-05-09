@@ -147,25 +147,25 @@ export default async function UicQueuePage() {
                       <li key={r.id} className="px-4 py-4">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="inline-flex h-5 items-center rounded bg-brand-600 px-1.5 text-[11px] font-bold text-white">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className="inline-flex h-5 items-center rounded bg-brand-600 px-1.5 text-[11px] font-bold text-white whitespace-nowrap">
                                 {firstGame.division_code}
                               </span>
                               <a
                                 href={LEAGUE_VENUE.mapsUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-sm text-brand-700 underline-offset-2 hover:underline"
+                                className="text-sm text-brand-700 underline-offset-2 hover:underline whitespace-nowrap"
                                 title={LEAGUE_VENUE.address}
                               >
                                 {firstGame.field}
                               </a>
-                              <span className="text-xs text-zinc-400">
+                              <span className="text-xs text-zinc-400 whitespace-nowrap">
                                 {formatMoney(firstGame.pay_per_slot)}/ump
                               </span>
                               {isBundle && (
-                                <span className="inline-flex h-5 items-center rounded-full bg-brand-100 px-2 text-[10px] font-bold text-brand-800">
-                                  Bundle: {b.games.length} games
+                                <span className="inline-flex h-5 items-center rounded-full bg-brand-100 px-2 text-[10px] font-bold text-brand-800 whitespace-nowrap">
+                                  Bundle · {b.games.length}
                                 </span>
                               )}
                             </div>
